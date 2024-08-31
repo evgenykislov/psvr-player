@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+/build-*/*
+*.txt.user
+*.md.backup
