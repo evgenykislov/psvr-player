@@ -1,21 +1,25 @@
 #include <cassert>
 #include <iostream>
 
+#include "version.h"
+
 const char kHelpMessage[] = \
-  "PS VR Player. Evgeny Kislov, 2024\n"
+  "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
   "Usage:\n"
   "  psvrplayer [options] command\n"
   "Commands:\n"
-  "  --listscreens\n"
-  "  --help\n"
-  "  --play=<file-name>\n"
-  "  --version\n"
+  "  --listscreens - show list of available screens and exit\n"
+  "  --help - show this help and exit\n"
+  "  --play=<file-name> - play movie from specified file\n"
+  "  --version - show version information and exit\n"
   "Options:\n"
-  "  --layer=sbs|ou|mono\n"
-  "  --screen=<screen>\n"
-  "  --swapcolor\n"
-  "  --swaplayer\n"
-  "  --vision=full|semi|flat\n";
+  "  --layer=sbs|ou|mono - specify layer configuration\n"
+  "  --screen=<screen> - specify screen to play movie\n"
+  "  --swapcolor - correct color\n"
+  "  --swaplayer - correct order of layers\n"
+  "  --vision=full|semi|flat - specify area of vision\n"
+  "More information see on https://apoheliy.com/psvrplayer/\n"
+  "";
 
 enum CmdCommand {
   kCommandUnspecified,
@@ -166,6 +170,15 @@ int main(int argc, char** argv) {
     std::cerr << "-----" << std::endl;
     PrintHelp();
     return 1;
+  }
+
+  if (cmd_command == kCommandHelp) {
+    PrintHelp();
+    return 0;
+  }
+  if (cmd_command == kCommandVersion) {
+    std::cout << kVersion << std::endl;
+    return 0;
   }
 
   std::cout << "Parsing success" << std::endl;
