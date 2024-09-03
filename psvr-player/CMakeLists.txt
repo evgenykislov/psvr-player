@@ -7,10 +7,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SOURCE_FILES
   "main.cpp"
+  "monitors.cpp"
   "glad/src/glad.c"
   )
 
 set(HEADER_FILES
+  "monitors.h"
   "version.h"
   )
 

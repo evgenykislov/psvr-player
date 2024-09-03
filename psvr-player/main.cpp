@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iostream>
 
+#include "monitors.h"
 #include "version.h"
 
 const char kHelpMessage[] = \
@@ -179,6 +180,9 @@ int main(int argc, char** argv) {
   if (cmd_command == kCommandVersion) {
     std::cout << kVersion << std::endl;
     return 0;
+  }
+  if (cmd_command == kCommandListScreen) {
+    return PrintMonitors();
   }
 
   std::cout << "Parsing success" << std::endl;
