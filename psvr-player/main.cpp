@@ -9,13 +9,13 @@ const char kHelpMessage[] = \
   "Usage:\n"
   "  psvrplayer [options] command\n"
   "Commands:\n"
-  "  --listscreens - show list of available screens and exit\n"
+  "  --listscreens - show list of available screens with their position and exit\n"
   "  --help - show this help and exit\n"
   "  --play=<file-name> - play movie from specified file\n"
   "  --version - show version information and exit\n"
   "Options:\n"
   "  --layer=sbs|ou|mono - specify layer configuration\n"
-  "  --screen=<screen> - specify screen to play movie\n"
+  "  --screen=<position> - specify screen (by position) to play movie\n"
   "  --swapcolor - correct color\n"
   "  --swaplayer - correct order of layers\n"
   "  --vision=full|semi|flat - specify area of vision\n"
@@ -38,7 +38,7 @@ enum CmdLayer {
   kLayerMono
 } cmd_layer = kLayerSbs;
 
-int cmd_screen = 0;
+std::string cmd_screen;
 bool cmd_swap_color = false;
 bool cmd_swap_layer = false;
 
@@ -119,7 +119,7 @@ bool ParseCmd(int argc, char** argv) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
         return false;
       }
-      cmd_screen = std::stoi(tail);
+      cmd_screen = tail;
     } else if (CheckArgument(arg, "--swapcolor", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;

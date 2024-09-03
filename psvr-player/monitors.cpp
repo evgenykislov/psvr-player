@@ -19,10 +19,10 @@ int PrintMonitors() {
   }
   mons = glfwGetMonitors(&amount);
   if (!mons) {
-    std::cerr << "ERROR: Can't get monitors list" << std::endl;
+    std::cerr << "ERROR: Can't get screens list" << std::endl;
     res = 1;
   } else {
-    std::cout << "Detected " << amount << " monitor[s]:" << std::endl;
+    std::cout << "Detected " << amount << " screen[s]:" << std::endl;
     for (int i = 0; i < amount; ++i) {
       auto name = glfwGetMonitorName(mons[i]);
       int x, y;
@@ -30,7 +30,7 @@ int PrintMonitors() {
       if (name) {
         std::cout << "  " << i + 1 << ". " << name << ". Position " << x << "x" << y << std::endl;
       } else {
-        std::cout << "  unknown monitor" << std::endl;
+        std::cout << "  -. unknown screen" << std::endl;
       }
     }
   }
