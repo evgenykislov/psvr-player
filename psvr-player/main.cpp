@@ -1,7 +1,9 @@
 #include <cassert>
 #include <iostream>
+#include <thread> // TODO Remove debug include
 
 #include "monitors.h"
+#include "play_screen.h"
 #include "version.h"
 
 const char kHelpMessage[] = \
@@ -183,6 +185,10 @@ int main(int argc, char** argv) {
   }
   if (cmd_command == kCommandListScreen) {
     return PrintMonitors();
+  }
+  if (cmd_command == kCommandPlay) {
+    auto ps = CreatePlayScreen(cmd_screen);
+    std::this_thread::sleep_for(std::chrono::seconds(10)); // TODO Remove debug wait
   }
 
   std::cout << "Parsing success" << std::endl;
