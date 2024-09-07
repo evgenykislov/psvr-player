@@ -26,8 +26,13 @@ set(HEADER_FILES
 find_package(LIBVLC REQUIRED)
 include_directories(${LIBVLC_INCLUDE_DIR})
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package (Threads REQUIRED)
+
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "glad/include" ".")
 target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
+target_link_libraries(${PROJECT_NAME} Threads::Threads)

@@ -1,3 +1,7 @@
+#ifdef __linux__
+#define FIX_POSIX_SIGNAL
+#endif
+
 #include "video_player.h"
 
 #include <cassert>
@@ -5,6 +9,10 @@
 #include <memory>
 
 #include <vlc/vlc.h>
+
+#ifdef FIX_POSIX_SIGNAL
+#include <signal.h>
+#endif
 
 
 /*! Класс для проигрывания видеофайла: открывает файл, выдаёт очередной кадр,
@@ -38,6 +46,16 @@ std::unique_ptr<IVideoPlayer> CreateVideoPlayer() {
 
 
 VideoPlayer::VideoPlayer(): lib_vlc_(nullptr) {
+  // OS specific requirements for vlc library
+#ifdef FIX_POSIX_SIGNAL
+  // Linux code
+  sigset_t sg;
+  signal(SIGCHLD, SIG_DFL);
+  sigemptyset(&sg);
+  sigaddset(&sg, SIGPIPE);
+  pthread_sigmask(SIG_BLOCK, &sg, NULL);
+#endif
+
   lib_vlc_ = libvlc_new(0, nullptr);
   if (!lib_vlc_) {
     const char* msg = libvlc_errmsg();
