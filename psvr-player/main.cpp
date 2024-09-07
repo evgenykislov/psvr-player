@@ -188,14 +188,27 @@ int main(int argc, char** argv) {
     return PrintMonitors();
   }
   if (cmd_command == kCommandPlay) {
-    auto ps = CreatePlayScreen(cmd_screen);
     auto vp = CreateVideoPlayer();
-    std::this_thread::sleep_for(std::chrono::seconds(10)); // TODO Remove debug wait
+    if (!vp) {
+      return 1;
+    }
+
+    if (!vp->OpenMovie(cmd_play_fname)) {
+      std::cerr << "Can't open movie" << std::endl;
+    }
+
+    while (vp->GetMovieState() == IVideoPlayer::MovieState::kMovieParsing) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+
+    auto ps = CreatePlayScreen(cmd_screen);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // TODO Remove debug wait
 
 
     delete ps;
   }
 
-  std::cout << "Parsing success" << std::endl;
   return 0;
 }
