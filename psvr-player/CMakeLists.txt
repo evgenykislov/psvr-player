@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
 
 project(psvrplayer LANGUAGES C CXX)
+project(${PROJECT_NAME} VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(SOURCE_FILES
   "main.cpp"
   "monitors.cpp"
   "play_screen.cpp"
+  "video_player.cpp"
   "glad/src/glad.c"
   )
 
@@ -16,9 +20,14 @@ set(HEADER_FILES
   "monitors.h"
   "play_screen.h"
   "version.h"
+  "video_player.h"
   )
+
+find_package(LIBVLC REQUIRED)
+include_directories(${LIBVLC_INCLUDE_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "glad/include" ".")
 target_link_libraries(${PROJECT_NAME} glfw)
+target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})

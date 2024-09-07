@@ -5,6 +5,7 @@
 #include "monitors.h"
 #include "play_screen.h"
 #include "version.h"
+#include "video_player.h"
 
 const char kHelpMessage[] = \
   "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
@@ -188,7 +189,11 @@ int main(int argc, char** argv) {
   }
   if (cmd_command == kCommandPlay) {
     auto ps = CreatePlayScreen(cmd_screen);
+    auto vp = CreateVideoPlayer();
     std::this_thread::sleep_for(std::chrono::seconds(10)); // TODO Remove debug wait
+
+
+    delete ps;
   }
 
   std::cout << "Parsing success" << std::endl;
