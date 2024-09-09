@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -28,6 +29,7 @@ class VideoPlayer: public IVideoPlayer {
   bool OpenMovie(const std::string& filename) override;
   void CloseMovie() override;
   IVideoPlayer::MovieState GetMovieState() override;
+  bool Play() override;
 
 
  private:
@@ -38,7 +40,15 @@ class VideoPlayer: public IVideoPlayer {
 
   libvlc_instance_t* lib_vlc_;
   libvlc_media_t* movie_media_;
+  libvlc_media_player_t* movie_player_;
   std::mutex lib_lock_; //!< Блокировка на доступ к объектам vlc библиотеки
+
+  // Переменные из колбэков vlc lib
+  unsigned video_width_; //!< Ширина видеопотока в пикселях
+  unsigned video_height_; //!< Высота видеопотока в пикселях
+  unsigned video_line_size_; //!< Размер одной линии в байтах. Должен быть кратна 32
+  unsigned video_lines_amount_; //!< Количество линии. Должно быть кратна 32
+  char* video_buffer_;
 
   std::atomic<IVideoPlayer::MovieState> movie_state_;
 
@@ -47,11 +57,20 @@ class VideoPlayer: public IVideoPlayer {
 
   void OnMediaParsed(const struct libvlc_event_t *p_event);
 
+  void* OnVideoBufferLock(void** planes);
+  void OnVideoBufferUnlock(void *picture, void *const *planes);
+  void OnVideoBufferDisplay(void *picture);
+  unsigned OnVideoFormat(char *chroma, unsigned *width, unsigned *height,
+      unsigned *pitches, unsigned *lines);
+  void OnVideoCleanup();
+
   // Raw Callbacks
-  static void OnMediaParsedRaw(const struct libvlc_event_t *p_event, void *p_data) {
-    assert(p_data);
-    reinterpret_cast<VideoPlayer*>(p_data)->OnMediaParsed(p_event);
-  }
+  static void OnMediaParsedRaw(const struct libvlc_event_t *p_event, void *p_data) { assert(p_data); reinterpret_cast<VideoPlayer*>(p_data)->OnMediaParsed(p_event); }
+  static void* OnVideoBufferLockRaw(void *opaque, void **planes) { assert(opaque); return reinterpret_cast<VideoPlayer*>(opaque)->OnVideoBufferLock(planes); }
+  static void OnVideoBufferUnlockRaw(void *opaque, void *picture, void *const *planes) { assert(opaque); reinterpret_cast<VideoPlayer*>(opaque)->OnVideoBufferUnlock(picture, planes); }
+  static void OnVideoBufferDisplayRaw(void *opaque, void *picture) { assert(opaque); reinterpret_cast<VideoPlayer*>(opaque)->OnVideoBufferDisplay(picture); }
+  static unsigned OnVideoFormatRaw(void **opaque, char *chroma, unsigned *width, unsigned *height, unsigned *pitches, unsigned *lines) { assert(opaque); assert(*opaque); return reinterpret_cast<VideoPlayer*>(*opaque)->OnVideoFormat(chroma, width, height, pitches, lines); }
+  static void OnVideoCleanupRaw(void *opaque) { assert(opaque); return reinterpret_cast<VideoPlayer*>(opaque)->OnVideoCleanup(); }
 
 };
 
@@ -69,7 +88,9 @@ std::unique_ptr<IVideoPlayer> CreateVideoPlayer() {
 
 
 VideoPlayer::VideoPlayer(): lib_vlc_(nullptr), movie_media_(nullptr),
-    movie_state_(IVideoPlayer::MovieState::kNoMovie){
+    movie_player_(nullptr), video_width_(0), video_height_(0),
+    video_line_size_(0), video_lines_amount_(0), video_buffer_(nullptr),
+    movie_state_(IVideoPlayer::MovieState::kNoMovie) {
   // OS specific requirements for vlc library
 #ifdef FIX_POSIX_SIGNAL
   // Linux code
@@ -90,12 +111,31 @@ VideoPlayer::VideoPlayer(): lib_vlc_(nullptr), movie_media_(nullptr),
     std::cerr << "  Additional information you can see on page: https://apoheliy.com/psvrplayer-vlc-err" << std::endl;
     throw std::runtime_error("vlc library error");
   }
+
+  movie_player_ = libvlc_media_player_new(lib_vlc_);
+  if (!movie_player_) {
+    std::cerr << "ERROR: Can't create new player" << std::endl;
+    const char* msg = libvlc_errmsg();
+    if (msg) {
+      std::cerr << "  Description: " << msg << std::endl;
+    }
+
+    libvlc_release(lib_vlc_);
+    throw std::runtime_error("vlc player error");
+  }
+
+  libvlc_video_set_callbacks(movie_player_, OnVideoBufferLockRaw,
+      OnVideoBufferUnlockRaw, OnVideoBufferDisplayRaw, this);
+  libvlc_video_set_format_callbacks(movie_player_,
+      OnVideoFormatRaw, OnVideoCleanupRaw);
 }
 
 
 VideoPlayer::~VideoPlayer() {
   assert(lib_vlc_);
+  assert(movie_player_);
   CloseMovieIntr();
+  libvlc_media_player_release(movie_player_);
   libvlc_release(lib_vlc_);
 }
 
@@ -146,8 +186,11 @@ IVideoPlayer::MovieState VideoPlayer::GetMovieState() {
   return movie_state_;
 }
 
+
 void VideoPlayer::CloseMovieIntr() {
+  assert(movie_player_);
   std::unique_lock<std::mutex> lk(lib_lock_);
+  libvlc_media_player_stop(movie_player_);
 
   if (movie_media_) {
     if (movie_state_ == IVideoPlayer::MovieState::kMovieParsing) {
@@ -157,6 +200,34 @@ void VideoPlayer::CloseMovieIntr() {
     movie_media_ = nullptr;
   }
   movie_state_ = IVideoPlayer::MovieState::kNoMovie;
+
+  libvlc_media_player_set_media(movie_player_, nullptr);
+}
+
+
+bool VideoPlayer::Play() {
+  std::unique_lock<std::mutex> lk(lib_lock_);
+  if (!movie_media_) {
+    std::cerr << "Movie isn't opened" << std::endl;
+    return false;
+  }
+  if (movie_state_ != IVideoPlayer::MovieState::kMovieReadyToPlay) {
+    std::cerr << "Movie hasn't parsed" << std::endl;
+    return false;
+  }
+
+  libvlc_media_player_set_media(movie_player_, movie_media_);
+  int res = libvlc_media_player_play(movie_player_);
+  if (res) {
+    std::cerr << "ERROR: Can't play movie" << std::endl;
+    const char* msg = libvlc_errmsg();
+    if (msg) {
+      std::cerr << "  Description: " << msg << std::endl;
+    }
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -172,4 +243,50 @@ void VideoPlayer::OnMediaParsed(const libvlc_event_t* p_event) {
       movie_state_ = IVideoPlayer::MovieState::kMovieReadyToPlay;
       break;
   }
+}
+
+void* VideoPlayer::OnVideoBufferLock(void** planes) {
+  *planes = video_buffer_;
+  // TODO Implement
+  return nullptr;
+}
+
+void VideoPlayer::OnVideoBufferUnlock(void* picture, void* const * planes)
+{
+  // TODO Implement
+  int k = 0;
+
+}
+
+void VideoPlayer::OnVideoBufferDisplay(void* picture)
+{
+  // TODO Implement
+  int k = 0;
+}
+
+unsigned VideoPlayer::OnVideoFormat(char* chroma, unsigned* width,
+    unsigned* height, unsigned* pitches, unsigned* lines) {
+  // Получаем формат видеофайла и можем выдать подходящий нам новый формат
+  try {
+    video_width_ = *width;
+    video_height_ = *height;
+    *pitches = video_line_size_ = ((video_width_ * 3 + 31) / 32) * 32;
+    *lines = video_lines_amount_ = ((video_height_ + 31) / 32) * 32;
+    std::memcpy(chroma, "RV24", 4); // Копируем только 4 байта, без нулевого
+
+    delete[] video_buffer_;
+    video_buffer_ = nullptr;
+    video_buffer_ = new char[video_line_size_ * video_lines_amount_];
+
+    return 1;
+  }  catch (std::bad_alloc&) {
+  }
+
+  return 0;
+}
+
+void VideoPlayer::OnVideoCleanup()
+{
+  delete[] video_buffer_;
+  video_buffer_ = nullptr;
 }
