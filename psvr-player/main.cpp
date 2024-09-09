@@ -204,7 +204,10 @@ int main(int argc, char** argv) {
     vp->Play();
 
     auto ps = CreatePlayScreen(cmd_screen);
-    std::this_thread::sleep_for(std::chrono::seconds(10)); // TODO Remove debug wait
+    if (ps) {
+      ps->SetKeyboardFilter();
+      ps->Run();
+    }
 
     delete ps;
   }

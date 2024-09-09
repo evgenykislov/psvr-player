@@ -1,5 +1,6 @@
 #include "play_screen.h"
 
+#include <cassert>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -17,6 +18,10 @@ class OpenGLScreen: public IPlayScreen {
   OpenGLScreen(std::string screen);
   virtual ~OpenGLScreen();
 
+  void Run() override;
+  void SetKeyboardFilter() override;
+
+
  private:
   OpenGLScreen() = delete;
   OpenGLScreen(const OpenGLScreen&) = delete;
@@ -28,6 +33,18 @@ class OpenGLScreen: public IPlayScreen {
 
   GLFWmonitor* GetMonitor(std::string screen);
   GLFWwindow* CreateWindow(GLFWmonitor* monitor);
+
+
+
+
+
+  // Raw callbacks
+  static void OnKeyRaw(GLFWwindow* wnd, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+      glfwSetWindowShouldClose(wnd, GLFW_TRUE);
+    }
+  }
+
 
 };
 
@@ -101,4 +118,21 @@ OpenGLScreen::~OpenGLScreen() {
     window_ = nullptr;
   }
   glfwTerminate();
+}
+
+void OpenGLScreen::Run() {
+  assert(window_);
+  while (!glfwWindowShouldClose(window_)) {
+    glfwWaitEvents();
+//    glfwPollEvents();
+
+    glfwSwapBuffers(window_);
+  }
+}
+
+void OpenGLScreen::SetKeyboardFilter() {
+  if (window_) {
+    glfwSetKeyCallback(window_, OnKeyRaw);
+  }
+  // TODO else processing
 }
