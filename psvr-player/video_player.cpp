@@ -30,6 +30,7 @@ class VideoPlayer: public IVideoPlayer {
   void CloseMovie() override;
   IVideoPlayer::MovieState GetMovieState() override;
   bool Play() override;
+  void SetDisplayFn(std::function<void(int, int, int, const void*)> fn) override;
 
 
  private:
@@ -44,13 +45,18 @@ class VideoPlayer: public IVideoPlayer {
   std::mutex lib_lock_; //!< Блокировка на доступ к объектам vlc библиотеки
 
   // Переменные из колбэков vlc lib
-  unsigned video_width_; //!< Ширина видеопотока в пикселях
-  unsigned video_height_; //!< Высота видеопотока в пикселях
   unsigned video_line_size_; //!< Размер одной линии в байтах. Должен быть кратна 32
+  unsigned video_line_width_; //!< Выровненный размер линии изображения в пикселях
   unsigned video_lines_amount_; //!< Количество линии. Должно быть кратна 32
   char* video_buffer_;
 
   std::atomic<IVideoPlayer::MovieState> movie_state_;
+
+  unsigned video_width_; //!< Ширина видеопотока в пикселях
+  unsigned video_height_; //!< Высота видеопотока в пикселях
+  std::function<void(int, int, int, const void*)> on_display_;
+  std::mutex on_display_lock_;
+
 
   /*! Закрыть видеофайл. Внутренняя реализация без привязки в интерфейсу IVideoPlayer */
   void CloseMovieIntr();
@@ -89,7 +95,7 @@ std::unique_ptr<IVideoPlayer> CreateVideoPlayer() {
 
 VideoPlayer::VideoPlayer(): lib_vlc_(nullptr), movie_media_(nullptr),
     movie_player_(nullptr), video_width_(0), video_height_(0),
-    video_line_size_(0), video_lines_amount_(0), video_buffer_(nullptr),
+    video_line_size_(0), video_line_width_(0), video_lines_amount_(0), video_buffer_(nullptr),
     movie_state_(IVideoPlayer::MovieState::kNoMovie) {
   // OS specific requirements for vlc library
 #ifdef FIX_POSIX_SIGNAL
@@ -217,6 +223,18 @@ bool VideoPlayer::Play() {
   }
 
   libvlc_media_player_set_media(movie_player_, movie_media_);
+
+  unsigned w, h;
+  if (libvlc_video_get_size(movie_player_, 0, &w, &h) != 0) {
+    std::cerr << "Movie hasn't correct width and height" << std::endl;
+    return false;
+  }
+
+  std::unique_lock<std::mutex> lk1(on_display_lock_);
+  video_width_ = w;
+  video_height_ = h;
+  lk1.unlock();
+
   int res = libvlc_media_player_play(movie_player_);
   if (res) {
     std::cerr << "ERROR: Can't play movie" << std::endl;
@@ -228,6 +246,11 @@ bool VideoPlayer::Play() {
   }
 
   return true;
+}
+
+void VideoPlayer::SetDisplayFn(std::function<void (int, int, int, const void*)> fn) {
+  std::lock_guard<std::mutex> lk(on_display_lock_);
+  on_display_ = fn;
 }
 
 
@@ -258,21 +281,24 @@ void VideoPlayer::OnVideoBufferUnlock(void* picture, void* const * planes)
 
 }
 
+
 void VideoPlayer::OnVideoBufferDisplay(void* picture)
 {
-  // TODO Implement
-  int k = 0;
+  std::lock_guard<std::mutex> lk(on_display_lock_);
+  if (on_display_) {
+    on_display_(video_width_, video_height_, video_line_width_, video_buffer_);
+  }
 }
+
 
 unsigned VideoPlayer::OnVideoFormat(char* chroma, unsigned* width,
     unsigned* height, unsigned* pitches, unsigned* lines) {
   // Получаем формат видеофайла и можем выдать подходящий нам новый формат
   try {
-    video_width_ = *width;
-    video_height_ = *height;
-    *pitches = video_line_size_ = ((video_width_ * 3 + 31) / 32) * 32;
-    *lines = video_lines_amount_ = ((video_height_ + 31) / 32) * 32;
-    std::memcpy(chroma, "RV24", 4); // Копируем только 4 байта, без нулевого
+    *pitches = video_line_size_ = ((*width * 4 + 31) / 32) * 32;
+    *lines = video_lines_amount_ = ((*height + 31) / 32) * 32;
+    video_line_width_ = video_line_size_ / 4;
+    std::memcpy(chroma, "RV32", 4); // Копируем только 4 байта, без нулевого
 
     delete[] video_buffer_;
     video_buffer_ = nullptr;

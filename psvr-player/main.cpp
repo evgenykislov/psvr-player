@@ -201,6 +201,17 @@ int main(int argc, char** argv) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
+    // TODO Remove debug
+    int counter = 0;
+    int width, height, align_width;
+    vp->SetDisplayFn([&counter, &width, &height, & align_width]
+                     (int a1, int a2, int a3, const void*){
+      ++counter;
+      width = a1;
+      height = a2;
+      align_width = a3;
+    });
+
     vp->Play();
 
     auto ps = CreatePlayScreen(cmd_screen);
@@ -210,6 +221,9 @@ int main(int argc, char** argv) {
     }
 
     delete ps;
+
+    std::cout << "Movie size (not synchro): " << counter << ", " << width <<
+        "x" << height << ", align " << align_width << "x" << height << std::endl; // TODO Remove debug
   }
 
   return 0;
