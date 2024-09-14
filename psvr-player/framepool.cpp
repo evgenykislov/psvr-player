@@ -14,7 +14,7 @@ Frame RequestFrame(int align_width, int align_height) {
     Frame fr = std::move(frame_pool_.back());
     frame_pool_.pop_back();
     int fr_width, fr_height;
-    fr.GetSizes(&fr_width, &fr_height, nullptr, nullptr);
+    fr.GetSizes(nullptr, nullptr, &fr_width, &fr_height);
     if (fr_width == align_width && fr_height == align_height) {
       return fr;
     }
