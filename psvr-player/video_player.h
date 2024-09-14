@@ -4,6 +4,8 @@
 #include <functional>
 #include <memory>
 
+#include "framepool.h"
+
 
 /*! Интерфейс для работы с проигрывателем видеофайлов */
 class IVideoPlayer {
@@ -53,7 +55,7 @@ class IVideoPlayer {
   ширина картинки - не меньше реальной ширины), data (данные о пикселях по 4
   байта на пиксель - для выравнивания). Выдаваемое изображение прижато к левому
   краю, в конце каждой линии могут быть мусорные пиксели для выравнивания */
-  virtual void SetDisplayFn(std::function<void(int, int, int, const void*)> fn) = 0;
+  virtual void SetDisplayFn(std::function<void(Frame&&)> fn) = 0;
 
   virtual ~IVideoPlayer() {}
 };

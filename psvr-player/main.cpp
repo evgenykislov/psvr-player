@@ -2,8 +2,10 @@
 #include <iostream>
 #include <thread> // TODO Remove debug include
 
+#include "framepool.h"
 #include "monitors.h"
 #include "play_screen.h"
+#include "transformer.h"
 #include "version.h"
 #include "video_player.h"
 
@@ -188,6 +190,17 @@ int main(int argc, char** argv) {
     return PrintMonitors();
   }
   if (cmd_command == kCommandPlay) {
+    auto ps = CreatePlayScreen(cmd_screen);
+    if (!ps) {
+      return 1;
+    }
+
+    auto trf = CreateTransformer(ps);
+    if (!trf) {
+      return 1;
+    }
+
+
     auto vp = CreateVideoPlayer();
     if (!vp) {
       return 1;
@@ -202,28 +215,17 @@ int main(int argc, char** argv) {
     }
 
     // TODO Remove debug
-    int counter = 0;
-    int width, height, align_width;
-    vp->SetDisplayFn([&counter, &width, &height, & align_width]
-                     (int a1, int a2, int a3, const void*){
-      ++counter;
-      width = a1;
-      height = a2;
-      align_width = a3;
+    vp->SetDisplayFn([&trf]
+                     (Frame&& frame){
+      trf->SetImage(std::move(frame));
     });
 
     vp->Play();
 
-    auto ps = CreatePlayScreen(cmd_screen);
     if (ps) {
       ps->SetKeyboardFilter();
       ps->Run();
     }
-
-    delete ps;
-
-    std::cout << "Movie size (not synchro): " << counter << ", " << width <<
-        "x" << height << ", align " << align_width << "x" << height << std::endl; // TODO Remove debug
   }
 
   return 0;
