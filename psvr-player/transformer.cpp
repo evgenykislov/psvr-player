@@ -59,7 +59,7 @@ class GlProgramm: public Transformer {
   GlProgramm(IPlayScreenPtr screen);
   ~GlProgramm();
 
-  void SetImage(int width, int height, int align_width, const void* data) override;
+  void SetImage(Frame&& frame) override;
  private:
   GlProgramm() = delete;
   GlProgramm(const GlProgramm&) = delete;
@@ -69,15 +69,16 @@ class GlProgramm: public Transformer {
 
   std::thread transform_thread_;
   IPlayScreenPtr screen_;
-  std::vector<char> buffer_;
 
+  std::vector<Frame> last_frames_;
+  std::mutex last_frames_lock_;
+
+  // Переменная обновления работает в два флага: shutdown_flag_ и не пустой last_frames_
+  // last_frames_ не под блокировкой переменной (update_lock_), поэтому нужно проверять
+  // каждый раз
   std::condition_variable update_var_;
-  bool update_flag_;
   bool shutdown_flag_;
   std::mutex update_lock_;
-
-  int align_width_;
-  int height_;
 
   void Processing();
 };
@@ -97,7 +98,6 @@ Transformer* CreateTransformer(IPlayScreenPtr screen) {
 GlProgramm::GlProgramm(IPlayScreenPtr screen) {
   screen_ = screen;
   shutdown_flag_ = false;
-  update_flag_ = false;
   if (!screen_) {
     std::cerr << "ERROR: Can't got screen" << std::endl;
     throw std::logic_error(__FUNCTION__);
@@ -118,23 +118,11 @@ GlProgramm::~GlProgramm() {
   }
 }
 
-void GlProgramm::SetImage(int width, int height, int align_width, const void* data) {
-  const size_t kPixelSize = 4;
-  size_t data_size = align_width * height * kPixelSize;
-  try {
-    // TODO Check the buffer is free now before resize
-    buffer_.resize(data_size);
-    std::memcpy(buffer_.data(), data, data_size);
-
-    align_width_ = align_width;
-    height_ = height;
-
-    std::unique_lock<std::mutex> lk(update_lock_);
-    update_flag_ = true;
-    update_var_.notify_all();
-    lk.unlock();
-  } catch (std::bad_alloc&) {
-  }
+void GlProgramm::SetImage(Frame&& frame) {
+  std::unique_lock<std::mutex> fr_lock(last_frames_lock_);
+  last_frames_.push_back(std::move(frame));
+  fr_lock.unlock();
+  update_var_.notify_all();
 }
 
 void GlProgramm::Processing() {
@@ -210,12 +198,28 @@ void GlProgramm::Processing() {
 
   while (true) {
     std::unique_lock<std::mutex> lk(update_lock_);
-    update_var_.wait(lk, [this](){ return update_flag_ || shutdown_flag_; });
-    if (shutdown_flag_) {
-      break;
+    if (shutdown_flag_) { break; }
+    update_var_.wait(lk);
+    if (shutdown_flag_) { break; }
+    lk.unlock();
+
+    // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
+    std::vector<Frame> last;
+    std::unique_lock<std::mutex> fl(last_frames_lock_);
+    std::swap(last, last_frames_);
+    fl.unlock();
+
+    if (last.empty()) {
+      continue;
     }
-    assert(update_flag_);
-    update_flag_ = false;
+
+    // Выбираем последний кадр в работу. Остальные возвращаем в пул
+    Frame frame = std::move(last.back());
+    last.pop_back();
+    while (!last.empty()) {
+      ReleaseFrame(std::move(last.back()));
+      last.pop_back();
+    }
 
     static float color = 0.0f;
     color += 1.0f / 250.0;
@@ -226,8 +230,15 @@ void GlProgramm::Processing() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glBindTexture(GL_TEXTURE_2D, tx);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, align_width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer_.data());
+    int width, height, align_width;
+    frame.GetSizes(&width, &height, &align_width, nullptr);
+    size_t data_size;
+    void* data = frame.GetData(data_size);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, align_width, height, 0, GL_RGBA,
+        GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_2D, 0);
+    ReleaseFrame(std::move(frame));
+
 
     glViewport(0, 0, 1900, 1000);
     glUseProgram(shaderProgram);

@@ -1,6 +1,7 @@
 #include "framepool.h"
 
 #include <cassert>
+#include <iostream>
 #include <mutex>
 #include <vector>
 
@@ -26,6 +27,7 @@ Frame RequestFrame(int align_width, int align_height) {
 
 void ReleaseFrame(Frame&& frame) {
   std::lock_guard<std::mutex> lk(pool_lock_);
+  frame.SetSize(0, 0);
   frame_pool_.push_back(std::move(frame));
 }
 
@@ -40,6 +42,16 @@ Frame::Frame(int align_width, int align_height) {
   align_width_ = align_width;
   width_ = 0;
   height_ = 0;
+
+  // Debug output
+  // std::cout << "Create frame " << align_width << "x" << align_height << std::endl;
+}
+
+Frame::~Frame() {
+  if (!data_.empty()) {
+    // Debug output
+    // std::cout << "Remove frame with data" << std::endl;
+  }
 }
 
 

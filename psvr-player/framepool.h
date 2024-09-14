@@ -13,9 +13,10 @@ class Frame {
   возникла ошибка, то выбрасывается исключение */
   Frame(int align_width, int align_height);
 
-  ~Frame() {}
+  ~Frame();
 
   Frame(Frame&& arg);
+
   Frame& operator=(Frame&& arg);
 
   /*! Установить внутренний размер кадра. Он может быть меньше максимального

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread> // TODO Remove debug include
 
+#include "framepool.h"
 #include "monitors.h"
 #include "play_screen.h"
 #include "transformer.h"
@@ -215,8 +216,8 @@ int main(int argc, char** argv) {
 
     // TODO Remove debug
     vp->SetDisplayFn([&trf]
-                     (int width, int height, int align_width, const void* data){
-      trf->SetImage(width, height, align_width, data);
+                     (Frame&& frame){
+      trf->SetImage(std::move(frame));
     });
 
     vp->Play();

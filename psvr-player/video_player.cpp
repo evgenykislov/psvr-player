@@ -32,7 +32,7 @@ class VideoPlayer: public IVideoPlayer {
   void CloseMovie() override;
   IVideoPlayer::MovieState GetMovieState() override;
   bool Play() override;
-  void SetDisplayFn(std::function<void(int, int, int, const void*)> fn) override;
+  void SetDisplayFn(std::function<void(Frame&&)> fn) override;
 
 
  private:
@@ -42,6 +42,7 @@ class VideoPlayer: public IVideoPlayer {
   VideoPlayer& operator=(VideoPlayer&&) = delete;
 
   const size_t kFramePoolSize = 4; //!< Количество предвариательно созданных фреймов
+  const size_t kFramePoolSizeAlarm = 10; //!< Количество кадров в обработке, когда уже начинается сигнализация переполнения
 
   libvlc_instance_t* lib_vlc_;
   libvlc_media_t* movie_media_;
@@ -52,14 +53,20 @@ class VideoPlayer: public IVideoPlayer {
   unsigned video_line_size_; //!< Размер одной линии в байтах. Должен быть кратна 32
   unsigned video_line_width_; //!< Выровненный размер линии изображения в пикселях
   unsigned video_lines_amount_; //!< Количество линии. Должно быть кратна 32
-  char* video_buffer_;
 
   std::atomic<IVideoPlayer::MovieState> movie_state_;
 
   unsigned video_width_; //!< Ширина видеопотока в пикселях
   unsigned video_height_; //!< Высота видеопотока в пикселях
-  std::function<void(int, int, int, const void*)> on_display_;
+  std::function<void(Frame&&)> on_display_;
   std::mutex on_display_lock_;
+
+  // Функционал фреймов используется для асинхронной выдачи фреймов:
+  // готовится фрейм в одном месте, вызов на отображение идёт в другом месте
+  // Теоретически возможно, что vlc подготовит сразу несколько фреймов и потом
+  // выдаст команды на вывод вразнобой.
+  std::vector<Frame> frames_;
+  std::mutex frames_lock_;
 
 
   /*! Закрыть видеофайл. Внутренняя реализация без привязки в интерфейсу IVideoPlayer */
@@ -99,7 +106,7 @@ IVideoPlayerPtr CreateVideoPlayer() {
 
 VideoPlayer::VideoPlayer(): lib_vlc_(nullptr), movie_media_(nullptr),
     movie_player_(nullptr), video_line_size_(0), video_line_width_(0),
-    video_lines_amount_(0), video_buffer_(nullptr),
+    video_lines_amount_(0),
     movie_state_(IVideoPlayer::MovieState::kNoMovie),
     video_width_(0), video_height_(0) {
   // OS specific requirements for vlc library
@@ -253,7 +260,7 @@ bool VideoPlayer::Play() {
   return true;
 }
 
-void VideoPlayer::SetDisplayFn(std::function<void (int, int, int, const void*)> fn) {
+void VideoPlayer::SetDisplayFn(std::function<void (Frame&&)> fn) {
   std::lock_guard<std::mutex> lk(on_display_lock_);
   on_display_ = fn;
 }
@@ -273,25 +280,54 @@ void VideoPlayer::OnMediaParsed(const libvlc_event_t* p_event) {
   }
 }
 
+
 void* VideoPlayer::OnVideoBufferLock(void** planes) {
-  *planes = video_buffer_;
-  // TODO Implement
-  return nullptr;
+  Frame fr = RequestFrame(video_line_width_, video_lines_amount_);
+  fr.SetSize(video_width_, video_height_);
+  size_t sz;
+  *planes = fr.GetData(sz);
+  std::lock_guard<std::mutex> lk(frames_lock_);
+  frames_.push_back(std::move(fr));
+  if (frames_.size() > kFramePoolSizeAlarm) {
+    std::cerr << "Frame processing OVERFLOW" << std::endl;
+  }
+  return *planes;
 }
 
-void VideoPlayer::OnVideoBufferUnlock(void* picture, void* const * planes)
-{
-  // TODO Implement
-  int k = 0;
 
+// TODO2 Remove?
+void VideoPlayer::OnVideoBufferUnlock(void* , void* const* ) {
 }
 
 
 void VideoPlayer::OnVideoBufferDisplay(void* picture)
 {
-  std::lock_guard<std::mutex> lk(on_display_lock_);
+  // Найдём фрейм по адресу блока данных
+  // Все игрища с поиском, указателями и т.д.
+  // нужны для корректной обработки схемы "у фрейма один владелец"
+  std::unique_lock<std::mutex> lk(frames_lock_);
+  int index = -1;
+  for (int i = 0; i < (int)frames_.size(); ++i) {
+    Frame& fr = frames_[i];
+    size_t sz;
+    if (fr.GetData(sz) == picture) {
+      index = i;
+      break;
+    }
+  }
+  assert(index != -1);
+  if (index == -1) {
+    std::cerr << "LOGIC_ERROR: frame has'n found" << std::endl;
+    return;
+  }
+
+  Frame fr = std::move(frames_[index]);
+  frames_.erase(frames_.begin() + index);
+  lk.unlock();
+
+  std::lock_guard<std::mutex> dl(on_display_lock_);
   if (on_display_) {
-    on_display_(video_width_, video_height_, video_line_width_, video_buffer_);
+    on_display_(std::move(fr));
   }
 }
 
@@ -316,12 +352,7 @@ unsigned VideoPlayer::OnVideoFormat(char* chroma, unsigned* width,
       cache.pop_back();
     }
 
-
-    delete[] video_buffer_;
-    video_buffer_ = nullptr;
-    video_buffer_ = new char[video_line_size_ * video_lines_amount_];
-
-    return 1;
+    return kFramePoolSize;
   }  catch (std::bad_alloc&) {
   }
 
@@ -330,6 +361,10 @@ unsigned VideoPlayer::OnVideoFormat(char* chroma, unsigned* width,
 
 void VideoPlayer::OnVideoCleanup()
 {
-  delete[] video_buffer_;
-  video_buffer_ = nullptr;
+  std::unique_lock<std::mutex> lk(frames_lock_);
+  while (!frames_.empty()) {
+    ReleaseFrame(std::move(frames_.back()));
+    frames_.pop_back();
+  }
+  lk.unlock();
 }
