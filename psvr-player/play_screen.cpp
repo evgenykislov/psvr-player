@@ -13,6 +13,9 @@
 #include <GLFW/glfw3.h>
 
 
+const int kDefaultQuitScancode = 9; //! Сканкод клавиши Esc для неанглийской раскладки (в этом случае клавиши в glfw определяются как неподдерживаемые)
+int quit_scancode_ = kDefaultQuitScancode;
+
 class OpenGLScreen: public IPlayScreen {
  public:
   OpenGLScreen(std::string screen);
@@ -20,6 +23,8 @@ class OpenGLScreen: public IPlayScreen {
 
   void Run() override;
   void SetKeyboardFilter() override;
+  void MakeScreenCurrent() override;
+  void DisplayBuffer() override;
 
 
  private:
@@ -35,27 +40,23 @@ class OpenGLScreen: public IPlayScreen {
   GLFWwindow* CreateWindow(GLFWmonitor* monitor);
 
 
-
-
-
   // Raw callbacks
   static void OnKeyRaw(GLFWwindow* wnd, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    if (scancode == quit_scancode_ && action == GLFW_PRESS) {
       glfwSetWindowShouldClose(wnd, GLFW_TRUE);
     }
   }
 
-
 };
 
 
-IPlayScreen* CreatePlayScreen(std::string screen) {
+IPlayScreenPtr CreatePlayScreen(std::string screen) {
   try {
-    return new OpenGLScreen(screen);
+    return std::shared_ptr<OpenGLScreen>(new OpenGLScreen(screen));
   }  catch (std::exception& err) {
     std::cerr << "ERROR: " << err.what() << std::endl;
   }
-  return nullptr;
+  return IPlayScreenPtr();
 }
 
 
@@ -68,6 +69,12 @@ OpenGLScreen::OpenGLScreen(std::string screen): window_(nullptr) {
     if (!mon) { throw std::runtime_error("Can't find specific screen"); }
     window_ = CreateWindow(mon);
     if (!window_) { throw std::runtime_error("Can't create window for screen"); }
+
+    auto sc = glfwGetKeyScancode(GLFW_KEY_ESCAPE);
+    if (sc != -1) {
+      quit_scancode_ = sc;
+    }
+
     // TODO Debug code
     int width, height;
     glfwGetWindowSize(window_, &width, &height);
@@ -124,9 +131,6 @@ void OpenGLScreen::Run() {
   assert(window_);
   while (!glfwWindowShouldClose(window_)) {
     glfwWaitEvents();
-//    glfwPollEvents();
-
-    glfwSwapBuffers(window_);
   }
 }
 
@@ -135,4 +139,17 @@ void OpenGLScreen::SetKeyboardFilter() {
     glfwSetKeyCallback(window_, OnKeyRaw);
   }
   // TODO else processing
+}
+
+void OpenGLScreen::MakeScreenCurrent() {
+  if (!window_) {
+    return; // TODO Error processing
+  }
+
+  glfwMakeContextCurrent(window_);
+}
+
+void OpenGLScreen::DisplayBuffer()
+{
+  glfwSwapBuffers(window_);
 }
