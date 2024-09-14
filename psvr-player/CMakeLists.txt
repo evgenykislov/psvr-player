@@ -12,6 +12,7 @@ set(SOURCE_FILES
   "main.cpp"
   "monitors.cpp"
   "play_screen.cpp"
+  "transformer.cpp"
   "video_player.cpp"
   "glad/src/glad.c"
   )
@@ -19,6 +20,7 @@ set(SOURCE_FILES
 set(HEADER_FILES
   "monitors.h"
   "play_screen.h"
+  "transformer.h"
   "version.h"
   "video_player.h"
   )
