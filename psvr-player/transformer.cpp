@@ -5,7 +5,9 @@
 #include <cassert>
 #include <condition_variable>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -17,42 +19,41 @@
 #include <GLFW/glfw3.h>
 
 #include "play_screen.h"
+#include "shaders/output.h"
 
 
-// TODO Bad style
-GLchar kVertexShader[] = "#version 330 core \n\
-\n\
-layout (location = 0) in vec3 position; \n\
-out vec2 TexCoord; \n\
-\n\
-void main() \n\
-{ \n\
-    gl_Position = vec4(position.x, position.y, position.z, 1.0); \n\
-    TexCoord = position.xy / 2 + vec2(0.5f, 0.5f); \n\
-} \n\
-";
+std::string UseConstOrLoadTextFile(const char* const_var, const char* fname) {
+  if (const_var[0]) {
+    // Константа не пустая
+    return const_var;
+  }
 
-// TODO Bad style
-GLchar kFragmentShader[] = "#version 330 core \n\
-\n\
-out vec4 color; \n\
-in vec2 TexCoord; \n\
-uniform sampler2D ourTexture; \n\
-\n\
-void main() \n\
-{ \n\
-  if (TexCoord.x < 0.1 || TexCoord.x > 0.9f || TexCoord.y < 0.1f || TexCoord.y > 0.9f) \n\
-  { color = vec4(1.0f, 0, 0, 1.0f); return; } \n\
-//  color = vec4(TexCoord.y, TexCoord.x, 1.0f, 1.0f); \n\
-//  return; \n\
-  vec4 tc = texture(ourTexture, TexCoord); \n\
-  color = tc; \n\
-  return; \n\
-  color = color / 2 + tc; \n\
-  color = tc; \n\
-//  color = vec4(1.0f, 0.5f, 0.2f, 0.5f); \n\
-} \n\
-";
+  std::stringstream str;
+  str << "../psvr-player/shaders/" << fname;
+  std::ifstream f(str.str());
+  std::string line;
+  std::stringstream res;
+  while (f) {
+    std::getline(f, line);
+    res << line << std::endl;
+  }
+
+  return res.str();
+}
+
+
+// Макрос для получения кода шейдеров как текст
+// Предварительно должна существовать текстовая константа с префиксом k,
+// т.е. если передаётся переменная VariableOne, то должна быть константа kVariableOne
+// Если константа не пустая, то код шейдера берётся из константы
+// Если константа пустая, то код берётся из файла
+// Параметры:
+// variable - имя переменной, которая будет создана как указатель на код
+// name - имя файла, который грузится, если константа пустая
+#define SHADER(variable, fname) \
+auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
+const GLchar* variable = variable##Code.c_str();
+
 
 class GlProgramm: public Transformer {
  public:
@@ -145,9 +146,9 @@ void GlProgramm::Processing() {
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
   GLuint vertexShader;
+  SHADER(OutputVertexShader, "output.vert");
   vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  const GLchar* v = kVertexShader;
-  glShaderSource(vertexShader, 1, &v, NULL);
+  glShaderSource(vertexShader, 1, &OutputVertexShader, NULL);
   glCompileShader(vertexShader);
 
   GLint success;
@@ -160,9 +161,9 @@ void GlProgramm::Processing() {
   }
 
   GLuint fragmentShader;
+  SHADER(OutputFragmentShader, "output.frag");
   fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  const GLchar* f = kFragmentShader;
-  glShaderSource(fragmentShader, 1, &f, NULL);
+  glShaderSource(fragmentShader, 1, &OutputFragmentShader, NULL);
   glCompileShader(fragmentShader);
   glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
   if(!success)

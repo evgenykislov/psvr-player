@@ -25,6 +25,13 @@ set(HEADER_FILES
   "transformer.h"
   "version.h"
   "video_player.h"
+  "shaders/output.h"
+  )
+
+# Additional files. They aren't used in compilation, but showed in project
+set(AUX_FILES
+  "shaders/output.frag"
+  "shaders/output.vert"
   )
 
 find_package(LIBVLC REQUIRED)
@@ -34,7 +41,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES} ${AUX_FILES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "glad/include" ".")
 target_link_libraries(${PROJECT_NAME} glfw)
