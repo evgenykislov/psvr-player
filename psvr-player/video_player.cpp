@@ -81,9 +81,9 @@ class VideoPlayer: public IVideoPlayer {
 };
 
 
-std::unique_ptr<IVideoPlayer> CreateVideoPlayer() {
+IVideoPlayerPtr CreateVideoPlayer() {
   try {
-    return std::unique_ptr<IVideoPlayer>(new VideoPlayer());
+    return std::shared_ptr<IVideoPlayer>(new VideoPlayer());
   } catch (std::bad_alloc&) {
     std::cerr << "ERROR: Lack of memory" << std::endl;
   } catch (std::runtime_error& err) {

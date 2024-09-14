@@ -58,10 +58,12 @@ class IVideoPlayer {
   virtual ~IVideoPlayer() {}
 };
 
+using IVideoPlayerPtr = std::shared_ptr<IVideoPlayer>;
+
 
 /*! Функция создания экземпляра видеопроигрывателя
 \return указатель на экземпляр класса видеопроигрывателя.\
 В случае ошибки возвращается пустой указатель. */
-std::unique_ptr<IVideoPlayer> CreateVideoPlayer();
+IVideoPlayerPtr CreateVideoPlayer();
 
 #endif // VIDEOPLAYER_H
