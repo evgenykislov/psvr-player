@@ -25,6 +25,8 @@ class OpenGLScreen: public IPlayScreen {
   void SetKeyboardFilter() override;
   void MakeScreenCurrent() override;
   void DisplayBuffer() override;
+  void GetFrameSize(int& width, int& height) override;
+
 
 
  private:
@@ -152,4 +154,8 @@ void OpenGLScreen::MakeScreenCurrent() {
 void OpenGLScreen::DisplayBuffer()
 {
   glfwSwapBuffers(window_);
+}
+
+void OpenGLScreen::GetFrameSize(int& width, int& height) {
+  glfwGetFramebufferSize(window_, &width, &height);
 }

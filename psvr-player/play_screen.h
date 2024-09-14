@@ -21,6 +21,7 @@ class IPlayScreen {
 
   virtual void DisplayBuffer() = 0;
 
+  virtual void GetFrameSize(int& width, int& height) = 0;
   // virtual void DisplayTexture(unsigned int );
 
 };

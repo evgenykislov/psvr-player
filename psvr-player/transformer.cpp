@@ -55,6 +55,19 @@ auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
 const GLchar* variable = variable##Code.c_str();
 
 
+GLfloat OutputSceneVertices[] = {
+  -1.0f, -1.0f, 0.0f,
+  -1.0f,  1.0f, 0.0f,
+   1.0f, -1.0f, 0.0f,
+  -1.0f,  1.0f, 0.0f,
+   1.0f, -1.0f, 0.0f,
+   1.0f,  1.0f, 0.0f
+};
+
+const GLint OutputSceneVerticesAmount = 6;
+
+
+
 class GlProgramm: public Transformer {
  public:
   GlProgramm(IPlayScreenPtr screen);
@@ -134,16 +147,12 @@ void GlProgramm::Processing() {
   }
 
 
-  GLfloat vertices[] = {
-      -1.0f, -1.0f, 0.0f,
-       1.0f, -1.0f, 0.0f,
-       0.0f,  1.0f, 0.0f
-  };
 
   GLuint VBO;
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(OutputSceneVertices),
+      OutputSceneVertices, GL_STATIC_DRAW);
 
   GLuint vertexShader;
   SHADER(OutputVertexShader, "output.vert");
@@ -222,14 +231,6 @@ void GlProgramm::Processing() {
       last.pop_back();
     }
 
-    static float color = 0.0f;
-    color += 1.0f / 250.0;
-    if (color > 1.0) {
-      color = 0.0f;
-    }
-    glClearColor(color, color, color, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
     glBindTexture(GL_TEXTURE_2D, tx);
     int width, height, align_width;
     frame.GetSizes(&width, &height, &align_width, nullptr);
@@ -240,14 +241,16 @@ void GlProgramm::Processing() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
 
+    int scrw, scrh;
+    screen_->GetFrameSize(scrw, scrh);
+    glViewport(0, 0, scrw, scrh);
 
-    glViewport(0, 0, 1900, 1000);
     glUseProgram(shaderProgram);
     glBindTexture(GL_TEXTURE_2D, tx);
     glBindVertexArray(vertex_array);
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLES, 0, OutputSceneVerticesAmount);
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
