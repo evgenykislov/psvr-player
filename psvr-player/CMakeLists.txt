@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(SOURCE_FILES
+  "framepool.cpp"
   "main.cpp"
   "monitors.cpp"
   "play_screen.cpp"
@@ -18,6 +19,7 @@ set(SOURCE_FILES
   )
 
 set(HEADER_FILES
+  "framepool.h"
   "monitors.h"
   "play_screen.h"
   "transformer.h"

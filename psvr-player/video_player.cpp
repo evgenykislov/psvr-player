@@ -17,6 +17,8 @@
 #include <signal.h>
 #endif
 
+#include "framepool.h"
+
 
 /*! Класс для проигрывания видеофайла: открывает файл, выдаёт очередной кадр,
 позволяет управлять потоком воспроизведения (пауза/стоп/перемотка) */
@@ -38,6 +40,8 @@ class VideoPlayer: public IVideoPlayer {
   VideoPlayer(VideoPlayer&&) = delete;
   VideoPlayer& operator=(const VideoPlayer&) = delete;
   VideoPlayer& operator=(VideoPlayer&&) = delete;
+
+  const size_t kFramePoolSize = 4; //!< Количество предвариательно созданных фреймов
 
   libvlc_instance_t* lib_vlc_;
   libvlc_media_t* movie_media_;
@@ -94,9 +98,10 @@ IVideoPlayerPtr CreateVideoPlayer() {
 
 
 VideoPlayer::VideoPlayer(): lib_vlc_(nullptr), movie_media_(nullptr),
-    movie_player_(nullptr), video_width_(0), video_height_(0),
-    video_line_size_(0), video_line_width_(0), video_lines_amount_(0), video_buffer_(nullptr),
-    movie_state_(IVideoPlayer::MovieState::kNoMovie) {
+    movie_player_(nullptr), video_line_size_(0), video_line_width_(0),
+    video_lines_amount_(0), video_buffer_(nullptr),
+    movie_state_(IVideoPlayer::MovieState::kNoMovie),
+    video_width_(0), video_height_(0) {
   // OS specific requirements for vlc library
 #ifdef FIX_POSIX_SIGNAL
   // Linux code
@@ -299,6 +304,18 @@ unsigned VideoPlayer::OnVideoFormat(char* chroma, unsigned* width,
     *lines = video_lines_amount_ = ((*height + 31) / 32) * 32;
     video_line_width_ = video_line_size_ / 4;
     std::memcpy(chroma, "RV32", 4); // Копируем только 4 байта, без нулевого
+
+    // Заполним пул фреймов: создадим kFramePoolSize фреймов и потом освободим
+    std::vector<Frame> cache;
+    cache.reserve(kFramePoolSize);
+    for (size_t i = 0; i < kFramePoolSize; ++i) {
+      cache.push_back(RequestFrame(video_line_width_, video_lines_amount_));
+    }
+    while (!cache.empty()) {
+      ReleaseFrame(std::move(cache.back()));
+      cache.pop_back();
+    }
+
 
     delete[] video_buffer_;
     video_buffer_ = nullptr;
