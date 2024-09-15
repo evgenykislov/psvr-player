@@ -8,6 +8,8 @@
 #include "transformer.h"
 #include "version.h"
 #include "video_player.h"
+#include "vr_helmet.h"
+
 
 const char kHelpMessage[] = \
   "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
@@ -190,6 +192,15 @@ int main(int argc, char** argv) {
     return PrintMonitors();
   }
   if (cmd_command == kCommandPlay) {
+    auto vr = CreateHelmet();
+    if (!vr) {
+      std::cerr << "PS VR Helmet not found" << std::endl;
+      return 1;
+    }
+
+    bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
+    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen : IHelmet::VRMode::kSingleScreen);
+
     auto ps = CreatePlayScreen(cmd_screen);
     if (!ps) {
       return 1;

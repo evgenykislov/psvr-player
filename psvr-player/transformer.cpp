@@ -236,7 +236,7 @@ void GlProgramm::Processing() {
     frame.GetSizes(&width, &height, &align_width, nullptr);
     size_t data_size;
     void* data = frame.GetData(data_size);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, align_width, height, 0, GL_RGBA,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, align_width, height, 0, GL_BGRA,
         GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
