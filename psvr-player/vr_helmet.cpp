@@ -26,33 +26,35 @@
 
 
 class PSVRHelmet: public IHelmet {
-public:
- PSVRHelmet();
- virtual ~PSVRHelmet();
+ public:
+  PSVRHelmet();
+  virtual ~PSVRHelmet();
 
- bool IsOpened();
+  bool IsOpened();
 
- bool SetVRMode(bool vrmode);
+  void SetVRMode(VRMode mode) override;
 
 
-private:
- PSVRHelmet(const PSVRHelmet&) = delete;
- PSVRHelmet(PSVRHelmet&&) = delete;
- PSVRHelmet& operator=(const PSVRHelmet&) = delete;
- PSVRHelmet& operator=(PSVRHelmet&&) = delete;
 
- const unsigned short kPsvrVendorID = 0x054c;
- const unsigned short kPsvrProductID = 0x09af;
- const char kPSVRHelmetInterface[4] = ":05";
- static const size_t kMaxBufferSize = 128;
+ private:
+  PSVRHelmet(const PSVRHelmet&) = delete;
+  PSVRHelmet(PSVRHelmet&&) = delete;
+  PSVRHelmet& operator=(const PSVRHelmet&) = delete;
+  PSVRHelmet& operator=(PSVRHelmet&&) = delete;
 
- unsigned char buffer_[kMaxBufferSize];
- void* device_; //!< Opened control device with hid_device* type. Or nullptr
+  const unsigned short kPsvrVendorID = 0x054c;
+  const unsigned short kPsvrProductID = 0x09af;
+  const char kPSVRHelmetInterface[4] = ":05";
+  static const size_t kMaxBufferSize = 128;
 
- bool OpenDevice();
- void CloseDevice();
+  unsigned char buffer_[kMaxBufferSize];
+  void* device_; //!< Opened control device with hid_device* type. Or nullptr
 
- std::string GetControlDevice();
+  bool OpenDevice();
+  void CloseDevice();
+  bool SplitScreen(bool split_mode);
+
+  std::string GetControlDevice();
 
 };
 
@@ -122,6 +124,7 @@ bool PSVRHelmet::OpenDevice() {
 
 void PSVRHelmet::CloseDevice() {
   if (device_) {
+    SplitScreen(false);
     hid_close((hid_device*)device_);
     device_ = nullptr;
   }
@@ -132,13 +135,16 @@ bool PSVRHelmet::IsOpened()
   return device_;
 }
 
-bool PSVRHelmet::SetVRMode(bool vrmode)
-{
+void PSVRHelmet::SetVRMode(IHelmet::VRMode mode) {
+  SplitScreen(mode == IHelmet::VRMode::kSplitScreen);
+}
+
+bool PSVRHelmet::SplitScreen(bool split_mode) {
   buffer_[0] = 0x23;
   buffer_[1] = 0x00;
   buffer_[2] = 0xaa;
   buffer_[3] = 0x04;
-  buffer_[4] = vrmode ? 0x01 : 0x00;
+  buffer_[4] = split_mode ? 0x01 : 0x00;
   buffer_[5] = 0x00;
   buffer_[6] = 0x00;
   buffer_[7] = 0x00;

@@ -23,7 +23,15 @@
 #include <memory>
 
 class IHelmet {
+ public:
+  virtual ~IHelmet() {}
 
+  enum class VRMode {
+    kSingleScreen = 0, //!< Плоский экран для 2d фильмов
+    kSplitScreen = 1 //!< Разделение экрана для 3d фильмов
+  };
+
+  virtual void SetVRMode(VRMode mode) = 0;
 };
 
 std::shared_ptr<IHelmet> CreateHelmet();

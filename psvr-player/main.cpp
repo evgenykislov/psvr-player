@@ -198,6 +198,9 @@ int main(int argc, char** argv) {
       return 1;
     }
 
+    bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
+    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen : IHelmet::VRMode::kSingleScreen);
+
     auto ps = CreatePlayScreen(cmd_screen);
     if (!ps) {
       return 1;
