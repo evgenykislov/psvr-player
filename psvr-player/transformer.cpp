@@ -11,16 +11,15 @@
 #include <thread>
 #include <vector>
 
-
 // Glfw library includes
 #define GLAD_GL_IMPLEMENTATION
 #include "glad/glad.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "frame_buffer.h"
 #include "play_screen.h"
 #include "shaders/output.h"
-
 
 std::string UseConstOrLoadTextFile(const char* const_var, const char* fname) {
   if (const_var[0]) {
@@ -41,39 +40,30 @@ std::string UseConstOrLoadTextFile(const char* const_var, const char* fname) {
   return res.str();
 }
 
-
 // Макрос для получения кода шейдеров как текст
 // Предварительно должна существовать текстовая константа с префиксом k,
-// т.е. если передаётся переменная VariableOne, то должна быть константа kVariableOne
-// Если константа не пустая, то код шейдера берётся из константы
+// т.е. если передаётся переменная VariableOne, то должна быть константа
+// kVariableOne Если константа не пустая, то код шейдера берётся из константы
 // Если константа пустая, то код берётся из файла
 // Параметры:
 // variable - имя переменной, которая будет создана как указатель на код
 // name - имя файла, который грузится, если константа пустая
-#define SHADER(variable, fname) \
-auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
-const GLchar* variable = variable##Code.c_str();
+#define SHADER(variable, fname)                                     \
+  auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
+  const GLchar* variable = variable##Code.c_str();
 
-
-GLfloat OutputSceneVertices[] = {
-  -1.0f, -1.0f, 0.0f,
-  -1.0f,  1.0f, 0.0f,
-   1.0f, -1.0f, 0.0f,
-  -1.0f,  1.0f, 0.0f,
-   1.0f, -1.0f, 0.0f,
-   1.0f,  1.0f, 0.0f
-};
+GLfloat OutputSceneVertices[] = {-1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+    -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
 
 const GLint OutputSceneVerticesAmount = 6;
 
-
-
-class GlProgramm: public Transformer {
+class GlProgramm : public Transformer {
  public:
   GlProgramm(IPlayScreenPtr screen);
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
+
  private:
   GlProgramm() = delete;
   GlProgramm(const GlProgramm&) = delete;
@@ -87,9 +77,9 @@ class GlProgramm: public Transformer {
   std::vector<Frame> last_frames_;
   std::mutex last_frames_lock_;
 
-  // Переменная обновления работает в два флага: shutdown_flag_ и не пустой last_frames_
-  // last_frames_ не под блокировкой переменной (update_lock_), поэтому нужно проверять
-  // каждый раз
+  // Переменная обновления работает в два флага: shutdown_flag_ и не пустой
+  // last_frames_ last_frames_ не под блокировкой переменной (update_lock_),
+  // поэтому нужно проверять каждый раз
   std::condition_variable update_var_;
   bool shutdown_flag_;
   std::mutex update_lock_;
@@ -97,14 +87,10 @@ class GlProgramm: public Transformer {
   void Processing();
 };
 
-
-
-
 Transformer* CreateTransformer(IPlayScreenPtr screen) {
   try {
     return new GlProgramm(screen);
-  }  catch (...) {
-
+  } catch (...) {
   }
   return nullptr;
 }
@@ -117,7 +103,7 @@ GlProgramm::GlProgramm(IPlayScreenPtr screen) {
     throw std::logic_error(__FUNCTION__);
   }
 
-  std::thread t([this](){ Processing(); });
+  std::thread t([this]() { Processing(); });
   std::swap(transform_thread_, t);
   assert(!t.joinable());
 }
@@ -142,11 +128,16 @@ void GlProgramm::SetImage(Frame&& frame) {
 void GlProgramm::Processing() {
   screen_->MakeScreenCurrent();
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "Can't initialize Glad context. Maybe a logic error: make current context for window first" << std::endl;
+    std::cerr << "Can't initialize Glad context. Maybe a logic error: make "
+                 "current context for window first"
+              << std::endl;
     throw std::runtime_error("Can't initialize Glad");
   }
 
-
+  FrameBuffer left_eye;
+  if (!CreateFrameBuffer(left_eye)) {
+    throw std::runtime_error("Can't initialize framebuffer");
+  }
 
   GLuint VBO;
   glGenBuffers(1, &VBO);
@@ -163,10 +154,10 @@ void GlProgramm::Processing() {
   GLint success;
   GLchar infoLog[512];
   glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-  if(!success)
-  {
+  if (!success) {
     glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
+              << infoLog << std::endl;
   }
 
   GLuint fragmentShader;
@@ -175,10 +166,10 @@ void GlProgramm::Processing() {
   glShaderSource(fragmentShader, 1, &OutputFragmentShader, NULL);
   glCompileShader(fragmentShader);
   glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-  if(!success)
-  {
+  if (!success) {
     glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+    std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
+              << infoLog << std::endl;
   }
 
   GLuint shaderProgram;
@@ -190,13 +181,15 @@ void GlProgramm::Processing() {
   glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
   if (!success) {
     glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-    std::cout << "ERROR::PROGRAMM::COMPILATION_FAILED\n" << infoLog << std::endl;
+    std::cout << "ERROR::PROGRAMM::COMPILATION_FAILED\n"
+              << infoLog << std::endl;
   }
 
   GLuint vertex_array;
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+  glVertexAttribPointer(
+      0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
   glEnableVertexAttribArray(0);
 
   GLuint tx;
@@ -208,9 +201,13 @@ void GlProgramm::Processing() {
 
   while (true) {
     std::unique_lock<std::mutex> lk(update_lock_);
-    if (shutdown_flag_) { break; }
+    if (shutdown_flag_) {
+      break;
+    }
     update_var_.wait(lk);
-    if (shutdown_flag_) { break; }
+    if (shutdown_flag_) {
+      break;
+    }
     lk.unlock();
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
@@ -257,4 +254,8 @@ void GlProgramm::Processing() {
 
     screen_->DisplayBuffer();
   }
+
+  glDeleteTextures(1, &tx);
+
+  DeleteFrameBuffer(left_eye);
 }

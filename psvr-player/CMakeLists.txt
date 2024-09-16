@@ -9,10 +9,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(SOURCE_FILES
+  "frame_buffer.cpp"
   "framepool.cpp"
   "main.cpp"
   "monitors.cpp"
   "play_screen.cpp"
+  "shader_program.cpp"
   "transformer.cpp"
   "video_player.cpp"
   "vr_helmet.cpp"
@@ -20,9 +22,11 @@ set(SOURCE_FILES
   )
 
 set(HEADER_FILES
+  "frame_buffer.h"
   "framepool.h"
   "monitors.h"
   "play_screen.h"
+  "shader_program.h"
   "transformer.h"
   "version.h"
   "video_player.h"

@@ -1,0 +1,4 @@
+#ifndef SHADER_PROGRAM_H
+#define SHADER_PROGRAM_H
+
+#endif  // SHADER_PROGRAM_H
