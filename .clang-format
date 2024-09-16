@@ -1,0 +1,7 @@
+﻿---
+BasedOnStyle: Google
+AlignAfterOpenBracket: DontAlign
+DerivePointerAlignment: 'false'
+PointerAlignment: Left
+
+...
