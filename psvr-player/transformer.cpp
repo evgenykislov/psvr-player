@@ -53,7 +53,12 @@ class GlProgramm : public Transformer {
   bool shutdown_flag_;
   std::mutex update_lock_;
 
+  unsigned int split_program_;
+
   void Processing();
+
+  void SplitScreen(unsigned int texture, FrameBuffer& left, FrameBuffer& right,
+      unsigned int vertex_id, unsigned int vertex_amount);
 };
 
 Transformer* CreateTransformer(IPlayScreenPtr screen) {
@@ -64,7 +69,7 @@ Transformer* CreateTransformer(IPlayScreenPtr screen) {
   return nullptr;
 }
 
-GlProgramm::GlProgramm(IPlayScreenPtr screen) {
+GlProgramm::GlProgramm(IPlayScreenPtr screen) : split_program_(0) {
   screen_ = screen;
   shutdown_flag_ = false;
   if (!screen_) {
@@ -111,8 +116,7 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't initialize right framebuffer");
   }
 
-  unsigned int split_program;
-  if (!CreateShaderProgram("split", split_program)) {
+  if (!CreateShaderProgram("split", split_program_)) {
     throw std::runtime_error("Can't create split program");
   }
 
@@ -181,12 +185,26 @@ void GlProgramm::Processing() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
 
+    SplitScreen(
+        tx, left_eye, right_eye, vertex_array, OutputSceneVerticesAmount);
+
     int scrw, scrh;
     screen_->GetFrameSize(scrw, scrh);
     glViewport(0, 0, scrw, scrh);
 
     glUseProgram(output_program);
-    glBindTexture(GL_TEXTURE_2D, tx);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
+    GLint loc = glGetUniformLocation(output_program, "left_image");
+    glUniform1i(loc, 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, right_eye.texture);
+    loc = glGetUniformLocation(output_program, "right_image");
+    glUniform1i(loc, 1);
+    glActiveTexture(GL_TEXTURE0);
+
+    //    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
     glBindVertexArray(vertex_array);
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -201,4 +219,43 @@ void GlProgramm::Processing() {
   glDeleteTextures(1, &tx);
 
   DeleteFrameBuffer(left_eye);
+  DeleteFrameBuffer(right_eye);
+  DeleteShaderProgram(split_program_);
+  DeleteShaderProgram(output_program);
+}
+
+void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
+    FrameBuffer& right, unsigned int vertex_id, unsigned int vertex_amount) {
+  // Разделим текстуру на две
+  GLint loc;
+
+  // Левая
+  glBindFramebuffer(GL_FRAMEBUFFER, left.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glUseProgram(split_program_);
+
+  loc = glGetUniformLocation(split_program_, "param");
+  glUniform1i(loc, 0);
+
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glBindVertexArray(vertex_id);
+  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Правая
+  glBindFramebuffer(GL_FRAMEBUFFER, right.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glUseProgram(split_program_);
+  glBindTexture(GL_TEXTURE_2D, texture);
+
+  loc = glGetUniformLocation(split_program_, "param");
+  glUniform1i(loc, 1);
+
+  glBindVertexArray(vertex_id);
+  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

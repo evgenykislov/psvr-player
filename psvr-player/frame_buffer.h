@@ -8,6 +8,8 @@ DeleteFrameBuffer */
 struct FrameBuffer {
   unsigned int buffer;  //!< Объект кадрового буфера, его номер в OpenGL
   unsigned int texture;  //!< ОБъект текстуры кадрового буфера (номер)
+
+  static const unsigned int texture_size = 1920;
 };
 
 /*! Создаём фреймбуфер ??? */
