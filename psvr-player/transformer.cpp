@@ -19,38 +19,7 @@
 
 #include "frame_buffer.h"
 #include "play_screen.h"
-#include "shaders/output.h"
-
-std::string UseConstOrLoadTextFile(const char* const_var, const char* fname) {
-  if (const_var[0]) {
-    // Константа не пустая
-    return const_var;
-  }
-
-  std::stringstream str;
-  str << "../psvr-player/shaders/" << fname;
-  std::ifstream f(str.str());
-  std::string line;
-  std::stringstream res;
-  while (f) {
-    std::getline(f, line);
-    res << line << std::endl;
-  }
-
-  return res.str();
-}
-
-// Макрос для получения кода шейдеров как текст
-// Предварительно должна существовать текстовая константа с префиксом k,
-// т.е. если передаётся переменная VariableOne, то должна быть константа
-// kVariableOne Если константа не пустая, то код шейдера берётся из константы
-// Если константа пустая, то код берётся из файла
-// Параметры:
-// variable - имя переменной, которая будет создана как указатель на код
-// name - имя файла, который грузится, если константа пустая
-#define SHADER(variable, fname)                                     \
-  auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
-  const GLchar* variable = variable##Code.c_str();
+#include "shader_program.h"
 
 GLfloat OutputSceneVertices[] = {-1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
     -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
@@ -134,57 +103,30 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't initialize Glad");
   }
 
-  FrameBuffer left_eye;
+  FrameBuffer left_eye, right_eye;
   if (!CreateFrameBuffer(left_eye)) {
-    throw std::runtime_error("Can't initialize framebuffer");
+    throw std::runtime_error("Can't initialize left framebuffer");
+  }
+  if (!CreateFrameBuffer(right_eye)) {
+    throw std::runtime_error("Can't initialize right framebuffer");
   }
 
+  unsigned int split_program;
+  if (!CreateShaderProgram("split", split_program)) {
+    throw std::runtime_error("Can't create split program");
+  }
+
+  unsigned int output_program;
+  if (!CreateShaderProgram("output", output_program)) {
+    throw std::runtime_error("Can't create output program");
+  }
+
+  // Буфер и др. для финального вывода в окно
   GLuint VBO;
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(OutputSceneVertices),
       OutputSceneVertices, GL_STATIC_DRAW);
-
-  GLuint vertexShader;
-  SHADER(OutputVertexShader, "output.vert");
-  vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertexShader, 1, &OutputVertexShader, NULL);
-  glCompileShader(vertexShader);
-
-  GLint success;
-  GLchar infoLog[512];
-  glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-              << infoLog << std::endl;
-  }
-
-  GLuint fragmentShader;
-  SHADER(OutputFragmentShader, "output.frag");
-  fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragmentShader, 1, &OutputFragmentShader, NULL);
-  glCompileShader(fragmentShader);
-  glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-              << infoLog << std::endl;
-  }
-
-  GLuint shaderProgram;
-  shaderProgram = glCreateProgram();
-
-  glAttachShader(shaderProgram, vertexShader);
-  glAttachShader(shaderProgram, fragmentShader);
-  glLinkProgram(shaderProgram);
-  glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-  if (!success) {
-    glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-    std::cout << "ERROR::PROGRAMM::COMPILATION_FAILED\n"
-              << infoLog << std::endl;
-  }
-
   GLuint vertex_array;
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
@@ -192,6 +134,7 @@ void GlProgramm::Processing() {
       0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
   glEnableVertexAttribArray(0);
 
+  // Входная текстура из проигрывателя
   GLuint tx;
   glGenTextures(1, &tx);
   glBindTexture(GL_TEXTURE_2D, tx);
@@ -242,7 +185,7 @@ void GlProgramm::Processing() {
     screen_->GetFrameSize(scrw, scrh);
     glViewport(0, 0, scrw, scrh);
 
-    glUseProgram(shaderProgram);
+    glUseProgram(output_program);
     glBindTexture(GL_TEXTURE_2D, tx);
     glBindVertexArray(vertex_array);
 

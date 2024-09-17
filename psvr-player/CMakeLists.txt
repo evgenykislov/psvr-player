@@ -31,13 +31,14 @@ set(HEADER_FILES
   "version.h"
   "video_player.h"
   "vr_helmet.h"
-  "shaders/output.h"
   )
 
 # Additional files. They aren't used in compilation, but showed in project
 set(AUX_FILES
   "shaders/output.frag"
   "shaders/output.vert"
+  "shaders/split.frag"
+  "shaders/split.vert"
   )
 
 find_package(LIBVLC REQUIRED)
