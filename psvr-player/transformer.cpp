@@ -11,69 +11,28 @@
 #include <thread>
 #include <vector>
 
-
 // Glfw library includes
 #define GLAD_GL_IMPLEMENTATION
 #include "glad/glad.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "frame_buffer.h"
 #include "play_screen.h"
-#include "shaders/output.h"
+#include "shader_program.h"
 
-
-std::string UseConstOrLoadTextFile(const char* const_var, const char* fname) {
-  if (const_var[0]) {
-    // Константа не пустая
-    return const_var;
-  }
-
-  std::stringstream str;
-  str << "../psvr-player/shaders/" << fname;
-  std::ifstream f(str.str());
-  std::string line;
-  std::stringstream res;
-  while (f) {
-    std::getline(f, line);
-    res << line << std::endl;
-  }
-
-  return res.str();
-}
-
-
-// Макрос для получения кода шейдеров как текст
-// Предварительно должна существовать текстовая константа с префиксом k,
-// т.е. если передаётся переменная VariableOne, то должна быть константа kVariableOne
-// Если константа не пустая, то код шейдера берётся из константы
-// Если константа пустая, то код берётся из файла
-// Параметры:
-// variable - имя переменной, которая будет создана как указатель на код
-// name - имя файла, который грузится, если константа пустая
-#define SHADER(variable, fname) \
-auto variable##Code = UseConstOrLoadTextFile(k##variable, fname); \
-const GLchar* variable = variable##Code.c_str();
-
-
-GLfloat OutputSceneVertices[] = {
-  -1.0f, -1.0f, 0.0f,
-  -1.0f,  1.0f, 0.0f,
-   1.0f, -1.0f, 0.0f,
-  -1.0f,  1.0f, 0.0f,
-   1.0f, -1.0f, 0.0f,
-   1.0f,  1.0f, 0.0f
-};
+GLfloat OutputSceneVertices[] = {-1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+    -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
 
 const GLint OutputSceneVerticesAmount = 6;
 
-
-
-class GlProgramm: public Transformer {
+class GlProgramm : public Transformer {
  public:
   GlProgramm(IPlayScreenPtr screen);
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
+
  private:
   GlProgramm() = delete;
   GlProgramm(const GlProgramm&) = delete;
@@ -87,29 +46,30 @@ class GlProgramm: public Transformer {
   std::vector<Frame> last_frames_;
   std::mutex last_frames_lock_;
 
-  // Переменная обновления работает в два флага: shutdown_flag_ и не пустой last_frames_
-  // last_frames_ не под блокировкой переменной (update_lock_), поэтому нужно проверять
-  // каждый раз
+  // Переменная обновления работает в два флага: shutdown_flag_ и не пустой
+  // last_frames_ last_frames_ не под блокировкой переменной (update_lock_),
+  // поэтому нужно проверять каждый раз
   std::condition_variable update_var_;
   bool shutdown_flag_;
   std::mutex update_lock_;
 
+  unsigned int split_program_;
+
   void Processing();
+
+  void SplitScreen(unsigned int texture, FrameBuffer& left, FrameBuffer& right,
+      unsigned int vertex_id, unsigned int vertex_amount);
 };
-
-
-
 
 Transformer* CreateTransformer(IPlayScreenPtr screen) {
   try {
     return new GlProgramm(screen);
-  }  catch (...) {
-
+  } catch (...) {
   }
   return nullptr;
 }
 
-GlProgramm::GlProgramm(IPlayScreenPtr screen) {
+GlProgramm::GlProgramm(IPlayScreenPtr screen) : split_program_(0) {
   screen_ = screen;
   shutdown_flag_ = false;
   if (!screen_) {
@@ -117,7 +77,7 @@ GlProgramm::GlProgramm(IPlayScreenPtr screen) {
     throw std::logic_error(__FUNCTION__);
   }
 
-  std::thread t([this](){ Processing(); });
+  std::thread t([this]() { Processing(); });
   std::swap(transform_thread_, t);
   assert(!t.joinable());
 }
@@ -142,63 +102,43 @@ void GlProgramm::SetImage(Frame&& frame) {
 void GlProgramm::Processing() {
   screen_->MakeScreenCurrent();
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "Can't initialize Glad context. Maybe a logic error: make current context for window first" << std::endl;
+    std::cerr << "Can't initialize Glad context. Maybe a logic error: make "
+                 "current context for window first"
+              << std::endl;
     throw std::runtime_error("Can't initialize Glad");
   }
 
+  FrameBuffer left_eye, right_eye;
+  if (!CreateFrameBuffer(left_eye)) {
+    throw std::runtime_error("Can't initialize left framebuffer");
+  }
+  if (!CreateFrameBuffer(right_eye)) {
+    throw std::runtime_error("Can't initialize right framebuffer");
+  }
 
+  if (!CreateShaderProgram("split", split_program_)) {
+    throw std::runtime_error("Can't create split program");
+  }
 
+  unsigned int output_program;
+  if (!CreateShaderProgram("output", output_program)) {
+    throw std::runtime_error("Can't create output program");
+  }
+
+  // Буфер и др. для финального вывода в окно
   GLuint VBO;
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(OutputSceneVertices),
       OutputSceneVertices, GL_STATIC_DRAW);
-
-  GLuint vertexShader;
-  SHADER(OutputVertexShader, "output.vert");
-  vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertexShader, 1, &OutputVertexShader, NULL);
-  glCompileShader(vertexShader);
-
-  GLint success;
-  GLchar infoLog[512];
-  glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-  if(!success)
-  {
-    glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-  }
-
-  GLuint fragmentShader;
-  SHADER(OutputFragmentShader, "output.frag");
-  fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragmentShader, 1, &OutputFragmentShader, NULL);
-  glCompileShader(fragmentShader);
-  glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-  if(!success)
-  {
-    glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-    std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-  }
-
-  GLuint shaderProgram;
-  shaderProgram = glCreateProgram();
-
-  glAttachShader(shaderProgram, vertexShader);
-  glAttachShader(shaderProgram, fragmentShader);
-  glLinkProgram(shaderProgram);
-  glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-  if (!success) {
-    glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-    std::cout << "ERROR::PROGRAMM::COMPILATION_FAILED\n" << infoLog << std::endl;
-  }
-
   GLuint vertex_array;
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+  glVertexAttribPointer(
+      0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
   glEnableVertexAttribArray(0);
 
+  // Входная текстура из проигрывателя
   GLuint tx;
   glGenTextures(1, &tx);
   glBindTexture(GL_TEXTURE_2D, tx);
@@ -208,9 +148,13 @@ void GlProgramm::Processing() {
 
   while (true) {
     std::unique_lock<std::mutex> lk(update_lock_);
-    if (shutdown_flag_) { break; }
+    if (shutdown_flag_) {
+      break;
+    }
     update_var_.wait(lk);
-    if (shutdown_flag_) { break; }
+    if (shutdown_flag_) {
+      break;
+    }
     lk.unlock();
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
@@ -241,12 +185,26 @@ void GlProgramm::Processing() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
 
+    SplitScreen(
+        tx, left_eye, right_eye, vertex_array, OutputSceneVerticesAmount);
+
     int scrw, scrh;
     screen_->GetFrameSize(scrw, scrh);
     glViewport(0, 0, scrw, scrh);
 
-    glUseProgram(shaderProgram);
-    glBindTexture(GL_TEXTURE_2D, tx);
+    glUseProgram(output_program);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
+    GLint loc = glGetUniformLocation(output_program, "left_image");
+    glUniform1i(loc, 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, right_eye.texture);
+    loc = glGetUniformLocation(output_program, "right_image");
+    glUniform1i(loc, 1);
+    glActiveTexture(GL_TEXTURE0);
+
+    //    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
     glBindVertexArray(vertex_array);
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -257,4 +215,47 @@ void GlProgramm::Processing() {
 
     screen_->DisplayBuffer();
   }
+
+  glDeleteTextures(1, &tx);
+
+  DeleteFrameBuffer(left_eye);
+  DeleteFrameBuffer(right_eye);
+  DeleteShaderProgram(split_program_);
+  DeleteShaderProgram(output_program);
+}
+
+void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
+    FrameBuffer& right, unsigned int vertex_id, unsigned int vertex_amount) {
+  // Разделим текстуру на две
+  GLint loc;
+
+  // Левая
+  glBindFramebuffer(GL_FRAMEBUFFER, left.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glUseProgram(split_program_);
+
+  loc = glGetUniformLocation(split_program_, "param");
+  glUniform1i(loc, 0);
+
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glBindVertexArray(vertex_id);
+  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Правая
+  glBindFramebuffer(GL_FRAMEBUFFER, right.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glUseProgram(split_program_);
+  glBindTexture(GL_TEXTURE_2D, texture);
+
+  loc = glGetUniformLocation(split_program_, "param");
+  glUniform1i(loc, 1);
+
+  glBindVertexArray(vertex_id);
+  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
