@@ -26,6 +26,12 @@ GLfloat OutputSceneVertices[] = {-1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
 
 const GLint OutputSceneVerticesAmount = 6;
 
+/*! Массив вершин для отрисовки, зарегистрированный как объект в opengl */
+struct VertexArray {
+  unsigned int array_id;  //!< Идентификатор массива вершин
+  unsigned int array_size;  //!< Размер массива, количество вершин в отрисовку
+};
+
 class GlProgramm : public Transformer {
  public:
   GlProgramm(IPlayScreenPtr screen);
@@ -55,10 +61,15 @@ class GlProgramm : public Transformer {
 
   unsigned int split_program_;
 
+  VertexArray cube_vertex_;  //!< Вершины для кубической сцены
+
   void Processing();
 
   void SplitScreen(unsigned int texture, FrameBuffer& left, FrameBuffer& right,
       unsigned int vertex_id, unsigned int vertex_amount);
+
+  /*! Создать/зарегистрировать массив вершин для отрисовки куба */
+  bool CreateCubeVertex(VertexArray& vertex);
 };
 
 Transformer* CreateTransformer(IPlayScreenPtr screen) {
@@ -123,6 +134,10 @@ void GlProgramm::Processing() {
   unsigned int output_program;
   if (!CreateShaderProgram("output", output_program)) {
     throw std::runtime_error("Can't create output program");
+  }
+
+  if (!CreateCubeVertex(cube_vertex_)) {
+    throw std::runtime_error("Can't create cube scene");
   }
 
   // Буфер и др. для финального вывода в окно
@@ -258,4 +273,49 @@ void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+bool GlProgramm::CreateCubeVertex(VertexArray& vertex) {
+  const GLuint kVertexAmount = 36;
+  GLfloat cube[kVertexAmount * 3] = {// Far face
+      // x   y      z
+      -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f,
+      -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f,
+      // Left face
+      // x   y      z
+      -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,
+      1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f,
+      // Right face
+      // x   y      z
+      1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f,
+      1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f,
+      // Far face
+      // x   y      z
+      -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f,
+      1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+      // Top face
+      // x   y      z
+      -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f, 1.0f,
+      -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f,
+      // Bottom face
+      // x   y      z
+      -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f,
+      -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f};
+
+  GLuint vbo;
+  glGenBuffers(1, &vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, kVertexAmount, cube, GL_STATIC_DRAW);
+  GLuint vertex_array;
+  glGenVertexArrays(1, &vertex_array);
+  glBindVertexArray(vertex_array);
+  glVertexAttribPointer(
+      0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+  glEnableVertexAttribArray(0);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glDeleteBuffers(1, &vbo);
+  vertex.array_id = vertex_array;
+  vertex.array_size = kVertexAmount;
+  return true;
 }
