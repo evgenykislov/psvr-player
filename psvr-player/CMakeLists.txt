@@ -35,6 +35,8 @@ set(HEADER_FILES
 
 # Additional files. They aren't used in compilation, but showed in project
 set(AUX_FILES
+  "shaders/halfcilinder.frag"
+  "shaders/halfcilinder.vert"
   "shaders/output.frag"
   "shaders/output.vert"
   "shaders/split.frag"

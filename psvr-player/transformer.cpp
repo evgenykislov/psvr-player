@@ -11,11 +11,16 @@
 #include <thread>
 #include <vector>
 
+// clang-format off
 // Glfw library includes
 #define GLAD_GL_IMPLEMENTATION
 #include "glad/glad.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+// clang-format on
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "frame_buffer.h"
 #include "play_screen.h"
@@ -59,14 +64,19 @@ class GlProgramm : public Transformer {
   bool shutdown_flag_;
   std::mutex update_lock_;
 
+  // Переменные для работы только в функциях процессинга
   unsigned int split_program_;
-
+  unsigned int half_cilinder_program_;
+  glm::mat4 projection_matrix_;  //!< Проекционная матрица
   VertexArray cube_vertex_;  //!< Вершины для кубической сцены
 
   void Processing();
 
   void SplitScreen(unsigned int texture, FrameBuffer& left, FrameBuffer& right,
       unsigned int vertex_id, unsigned int vertex_amount);
+
+  void HalfCilinder(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
+      const glm::mat4& transform);
 
   /*! Создать/зарегистрировать массив вершин для отрисовки куба */
   bool CreateCubeVertex(VertexArray& vertex);
@@ -80,7 +90,8 @@ Transformer* CreateTransformer(IPlayScreenPtr screen) {
   return nullptr;
 }
 
-GlProgramm::GlProgramm(IPlayScreenPtr screen) : split_program_(0) {
+GlProgramm::GlProgramm(IPlayScreenPtr screen)
+    : split_program_(0), half_cilinder_program_(0) {
   screen_ = screen;
   shutdown_flag_ = false;
   if (!screen_) {
@@ -127,8 +138,17 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't initialize right framebuffer");
   }
 
+  FrameBuffer left_scene, right_scene;
+  if (!CreateFrameBuffer(left_scene) || !CreateFrameBuffer(right_scene)) {
+    throw std::runtime_error("Can't initialize scene framebuffers");
+  }
+
   if (!CreateShaderProgram("split", split_program_)) {
     throw std::runtime_error("Can't create split program");
+  }
+
+  if (!CreateShaderProgram("halfcilinder", half_cilinder_program_)) {
+    throw std::runtime_error("Can't create half cilinder program");
   }
 
   unsigned int output_program;
@@ -139,6 +159,9 @@ void GlProgramm::Processing() {
   if (!CreateCubeVertex(cube_vertex_)) {
     throw std::runtime_error("Can't create cube scene");
   }
+
+  // Проекционная матрица на квадратное поле зрения
+  projection_matrix_ = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 3.0f);
 
   // Буфер и др. для финального вывода в окно
   GLuint VBO;
@@ -203,6 +226,21 @@ void GlProgramm::Processing() {
     SplitScreen(
         tx, left_eye, right_eye, vertex_array, OutputSceneVerticesAmount);
 
+    // Демонстрационный разворот
+    static double full_turn = 0;
+    full_turn += 0.003;
+
+    const double kTurn = 2.0 * 3.1415926;
+    if (full_turn > 1.0) {
+      full_turn -= 1.0;
+    }
+
+    glm::mat4 rotation_matrix = glm::rotate(
+        glm::mat4(1.0f), float(full_turn * kTurn), glm::vec3(0.0f, 1.0f, 0.0f));
+    auto transform = projection_matrix_ * rotation_matrix;
+
+    HalfCilinder(left_eye, left_scene, transform);
+
     int scrw, scrh;
     screen_->GetFrameSize(scrw, scrh);
     glViewport(0, 0, scrw, scrh);
@@ -210,7 +248,7 @@ void GlProgramm::Processing() {
     glUseProgram(output_program);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
+    glBindTexture(GL_TEXTURE_2D, left_scene.texture);
     GLint loc = glGetUniformLocation(output_program, "left_image");
     glUniform1i(loc, 0);
     glActiveTexture(GL_TEXTURE1);
@@ -235,7 +273,10 @@ void GlProgramm::Processing() {
 
   DeleteFrameBuffer(left_eye);
   DeleteFrameBuffer(right_eye);
+  DeleteFrameBuffer(left_scene);
+  DeleteFrameBuffer(right_scene);
   DeleteShaderProgram(split_program_);
+  DeleteShaderProgram(half_cilinder_program_);
   DeleteShaderProgram(output_program);
 }
 
@@ -275,12 +316,37 @@ void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void GlProgramm::HalfCilinder(const FrameBuffer& in_buffer,
+    const FrameBuffer& out_buffer, const glm::mat4& transform) {
+  glBindFramebuffer(GL_FRAMEBUFFER, out_buffer.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glUseProgram(half_cilinder_program_);
+  glBindTexture(GL_TEXTURE_2D, in_buffer.texture);
+  auto tr_var = glGetUniformLocation(half_cilinder_program_, "transformation");
+  glUniformMatrix4fv(tr_var, 1, GL_TRUE, glm::value_ptr(transform));
+
+  glBindVertexArray(cube_vertex_.array_id);
+  //      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glDrawArrays(GL_TRIANGLES, 0, cube_vertex_.array_size);
+  //      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 bool GlProgramm::CreateCubeVertex(VertexArray& vertex) {
   const GLuint kVertexAmount = 36;
-  GLfloat cube[kVertexAmount * 3] = {// Far face
-      // x   y      z
-      -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f,
-      -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f,
+  GLfloat cube[kVertexAmount * 3] = {// clang-format off
+    // Far face
+    // x   y      z
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
       // Left face
       // x   y      z
       -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,
@@ -301,11 +367,12 @@ bool GlProgramm::CreateCubeVertex(VertexArray& vertex) {
       // x   y      z
       -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f,
       -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f};
+    // clang-format off
 
   GLuint vbo;
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, kVertexAmount, cube, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(cube), cube, GL_STATIC_DRAW);
   GLuint vertex_array;
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
