@@ -26,11 +26,6 @@
 #include "play_screen.h"
 #include "shader_program.h"
 
-GLfloat OutputSceneVertices[] = {-1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-    -1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f};
-
-const GLint OutputSceneVerticesAmount = 6;
-
 /*! Массив вершин для отрисовки, зарегистрированный как объект в opengl */
 struct VertexArray {
   unsigned int array_id;  //!< Идентификатор массива вершин
@@ -68,18 +63,27 @@ class GlProgramm : public Transformer {
   unsigned int split_program_;
   unsigned int half_cilinder_program_;
   glm::mat4 projection_matrix_;  //!< Проекционная матрица
-  VertexArray cube_vertex_;  //!< Вершины для кубической сцены
+  VertexArray cube_vertex_;  //!< Вершины для кубической сцены (формирование
+                             //!< полусфер и т.д.)
+  VertexArray flat_vertex_;  //!< Вершины для плоской сцены (вывод изображений)
 
   void Processing();
 
+  // TODO ???
   void SplitScreen(unsigned int texture, FrameBuffer& left, FrameBuffer& right,
-      unsigned int vertex_id, unsigned int vertex_amount);
+      unsigned int width, unsigned int aligned_width);
 
   void HalfCilinder(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
       const glm::mat4& transform);
 
+  /*! Удалить массив вершин */
+  void DeleteVertex(VertexArray& vertex);
+
   /*! Создать/зарегистрировать массив вершин для отрисовки куба */
   bool CreateCubeVertex(VertexArray& vertex);
+
+  // TODO ???
+  bool CreateFlatVertex(VertexArray& vertex);
 };
 
 Transformer* CreateTransformer(IPlayScreenPtr screen) {
@@ -94,6 +98,9 @@ GlProgramm::GlProgramm(IPlayScreenPtr screen)
     : split_program_(0), half_cilinder_program_(0) {
   screen_ = screen;
   shutdown_flag_ = false;
+  cube_vertex_.array_id = 0;
+  flat_vertex_.array_id = 0;
+
   if (!screen_) {
     std::cerr << "ERROR: Can't got screen" << std::endl;
     throw std::logic_error(__FUNCTION__);
@@ -160,21 +167,12 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't create cube scene");
   }
 
+  if (!CreateFlatVertex(flat_vertex_)) {
+    throw std::runtime_error("Can't create flat scene");
+  }
+
   // Проекционная матрица на квадратное поле зрения
   projection_matrix_ = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 3.0f);
-
-  // Буфер и др. для финального вывода в окно
-  GLuint VBO;
-  glGenBuffers(1, &VBO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(OutputSceneVertices),
-      OutputSceneVertices, GL_STATIC_DRAW);
-  GLuint vertex_array;
-  glGenVertexArrays(1, &vertex_array);
-  glBindVertexArray(vertex_array);
-  glVertexAttribPointer(
-      0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-  glEnableVertexAttribArray(0);
 
   // Входная текстура из проигрывателя
   GLuint tx;
@@ -223,8 +221,7 @@ void GlProgramm::Processing() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
 
-    SplitScreen(
-        tx, left_eye, right_eye, vertex_array, OutputSceneVerticesAmount);
+    SplitScreen(tx, left_eye, right_eye, width, align_width);
 
     // Демонстрационный разворот
     static double full_turn = 0;
@@ -258,10 +255,9 @@ void GlProgramm::Processing() {
     glActiveTexture(GL_TEXTURE0);
 
     //    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
-    glBindVertexArray(vertex_array);
-
+    glBindVertexArray(flat_vertex_.array_id);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glDrawArrays(GL_TRIANGLES, 0, OutputSceneVerticesAmount);
+    glDrawArrays(GL_TRIANGLES, 0, flat_vertex_.array_size);
 
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
@@ -278,10 +274,13 @@ void GlProgramm::Processing() {
   DeleteShaderProgram(split_program_);
   DeleteShaderProgram(half_cilinder_program_);
   DeleteShaderProgram(output_program);
+
+  DeleteVertex(cube_vertex_);
+  DeleteVertex(flat_vertex_);
 }
 
 void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
-    FrameBuffer& right, unsigned int vertex_id, unsigned int vertex_amount) {
+    FrameBuffer& right, unsigned int width, unsigned int aligned_width) {
   // Разделим текстуру на две
   GLint loc;
 
@@ -290,12 +289,15 @@ void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
   glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
   glUseProgram(split_program_);
 
-  loc = glGetUniformLocation(split_program_, "param");
+  loc = glGetUniformLocation(split_program_, "part_index");
   glUniform1i(loc, 0);
 
+  loc = glGetUniformLocation(split_program_, "image_width");
+  glUniform1f(loc, float(width) / aligned_width);
+
   glBindTexture(GL_TEXTURE_2D, texture);
-  glBindVertexArray(vertex_id);
-  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindVertexArray(flat_vertex_.array_id);
+  glDrawArrays(GL_TRIANGLES, 0, flat_vertex_.array_size);
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -306,11 +308,11 @@ void GlProgramm::SplitScreen(unsigned int texture, FrameBuffer& left,
   glUseProgram(split_program_);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  loc = glGetUniformLocation(split_program_, "param");
+  loc = glGetUniformLocation(split_program_, "part_index");
   glUniform1i(loc, 1);
 
-  glBindVertexArray(vertex_id);
-  glDrawArrays(GL_TRIANGLES, 0, vertex_amount);
+  glBindVertexArray(flat_vertex_.array_id);
+  glDrawArrays(GL_TRIANGLES, 0, flat_vertex_.array_size);
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -334,6 +336,12 @@ void GlProgramm::HalfCilinder(const FrameBuffer& in_buffer,
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GlProgramm::DeleteVertex(VertexArray& vertex) {
+  glDeleteVertexArrays(1, &vertex.array_id);
+  vertex.array_id = 0;
+  vertex.array_size = 0;
 }
 
 bool GlProgramm::CreateCubeVertex(VertexArray& vertex) {
@@ -367,12 +375,43 @@ bool GlProgramm::CreateCubeVertex(VertexArray& vertex) {
       // x   y      z
       -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f,
       -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f};
-    // clang-format off
+  // clang-format on
 
   GLuint vbo;
   glGenBuffers(1, &vbo);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(cube), cube, GL_STATIC_DRAW);
+  GLuint vertex_array;
+  glGenVertexArrays(1, &vertex_array);
+  glBindVertexArray(vertex_array);
+  glVertexAttribPointer(
+      0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+  glEnableVertexAttribArray(0);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glDeleteBuffers(1, &vbo);
+  vertex.array_id = vertex_array;
+  vertex.array_size = kVertexAmount;
+  return true;
+}
+
+bool GlProgramm::CreateFlatVertex(VertexArray& vertex) {
+  const GLint kVertexAmount = 6;
+  // clang-format off
+  GLfloat flat[kVertexAmount * 3] = {
+    -1.0f, -1.0f,  0.0f,
+    -1.0f,  1.0f,  0.0f,
+     1.0f, -1.0f,  0.0f,
+    -1.0f,  1.0f,  0.0f,
+     1.0f, -1.0f,  0.0f,
+     1.0f,  1.0f,  0.0f
+  };
+  // clang-format on
+
+  GLuint vbo;
+  glGenBuffers(1, &vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(flat), flat, GL_STATIC_DRAW);
   GLuint vertex_array;
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
