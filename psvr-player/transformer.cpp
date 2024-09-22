@@ -38,6 +38,7 @@ class GlProgramm : public Transformer {
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
+  void SetEyeSwap(bool swap) override;
 
  private:
   GlProgramm() = delete;
@@ -51,6 +52,8 @@ class GlProgramm : public Transformer {
 
   std::vector<Frame> last_frames_;
   std::mutex last_frames_lock_;
+  bool swap_eyes_setting_;  //!< Настройка по смене порядка изображений для
+                            //!< глаз. Настройка под блокировкой update_lock_
 
   // Переменная обновления работает в два флага: shutdown_flag_ и не пустой
   // last_frames_ last_frames_ не под блокировкой переменной (update_lock_),
@@ -95,7 +98,7 @@ Transformer* CreateTransformer(IPlayScreenPtr screen) {
 }
 
 GlProgramm::GlProgramm(IPlayScreenPtr screen)
-    : split_program_(0), half_cilinder_program_(0) {
+    : split_program_(0), half_cilinder_program_(0), swap_eyes_setting_(false) {
   screen_ = screen;
   shutdown_flag_ = false;
   cube_vertex_.array_id = 0;
@@ -126,6 +129,11 @@ void GlProgramm::SetImage(Frame&& frame) {
   last_frames_.push_back(std::move(frame));
   fr_lock.unlock();
   update_var_.notify_all();
+}
+
+void GlProgramm::SetEyeSwap(bool swap) {
+  std::unique_lock<std::mutex> lk(update_lock_);
+  swap_eyes_setting_ = swap;
 }
 
 void GlProgramm::Processing() {
@@ -183,6 +191,7 @@ void GlProgramm::Processing() {
   glBindTexture(GL_TEXTURE_2D, 0);
 
   while (true) {
+    bool swap_eyes;  //!< Локальное значение настройки swap_eyes_setting_
     std::unique_lock<std::mutex> lk(update_lock_);
     if (shutdown_flag_) {
       break;
@@ -191,6 +200,7 @@ void GlProgramm::Processing() {
     if (shutdown_flag_) {
       break;
     }
+    swap_eyes = swap_eyes_setting_;
     lk.unlock();
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
@@ -221,22 +231,18 @@ void GlProgramm::Processing() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ReleaseFrame(std::move(frame));
 
-    SplitScreen(tx, left_eye, right_eye, width, align_width);
-
-    // Демонстрационный разворот
-    static double full_turn = 0;
-    full_turn += 0.003;
-
-    const double kTurn = 2.0 * 3.1415926;
-    if (full_turn > 1.0) {
-      full_turn -= 1.0;
+    if (swap_eyes) {
+      SplitScreen(tx, right_eye, left_eye, width, align_width);
+    } else {
+      SplitScreen(tx, left_eye, right_eye, width, align_width);
     }
 
-    glm::mat4 rotation_matrix = glm::rotate(
-        glm::mat4(1.0f), float(full_turn * kTurn), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 rotation_matrix =
+        glm::rotate(glm::mat4(1.0f), float(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     auto transform = projection_matrix_ * rotation_matrix;
 
     HalfCilinder(left_eye, left_scene, transform);
+    HalfCilinder(right_eye, right_scene, transform);
 
     int scrw, scrh;
     screen_->GetFrameSize(scrw, scrh);
@@ -249,7 +255,7 @@ void GlProgramm::Processing() {
     GLint loc = glGetUniformLocation(output_program, "left_image");
     glUniform1i(loc, 0);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, right_eye.texture);
+    glBindTexture(GL_TEXTURE_2D, right_scene.texture);
     loc = glGetUniformLocation(output_program, "right_image");
     glUniform1i(loc, 1);
     glActiveTexture(GL_TEXTURE0);

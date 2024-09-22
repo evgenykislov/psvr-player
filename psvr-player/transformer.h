@@ -9,10 +9,13 @@ class Transformer {
  public:
   virtual ~Transformer() {}
 
+  // TODO ???
   virtual void SetImage(Frame&& frame) = 0;
+
+  // TODO ???
+  virtual void SetEyeSwap(bool swap) = 0;
 };
 
 Transformer* CreateTransformer(IPlayScreenPtr screen);
 
-
-#endif // TRANSFORMER_H
+#endif  // TRANSFORMER_H
