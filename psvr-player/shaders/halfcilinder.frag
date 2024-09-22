@@ -1,5 +1,7 @@
 #version 330 core
 
+#define M_PI 3.1415926535897932384626433832795
+
 out vec4 color;
 in vec4 scene_pos;
 uniform sampler2D image;
@@ -7,33 +9,29 @@ uniform sampler2D image;
 void main()
 {
   vec4 pos = scene_pos;
+  float x_angle;
+  float y_angle;
+  float l_hor; //!< Расстояние до отображаемой точки по горизонтали
 
-  if (pos.z > 0.99 && pos.z < 1.01) {
-    color = vec4(0, 0, 1, 1);
-    return;
-  }
-  if (pos.z < -0.99 && pos.z > -1.01) {
-    color = vec4(0, 0, 0.5, 1);
-    return;
-  }
-
-  if (pos.x > 0.99 && pos.x < 1.01) {
-    color = vec4(0, 1, 0, 1);
-    return;
-  }
-  if (pos.x < -0.99 && pos.x > -1.01) {
-    color = vec4(0, 0.5, 0, 1);
+  if (scene_pos.z >= 0.0f) {
+    // Вид за спиной
+    color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
     return;
   }
 
-  if (pos.y > 0.99 && pos.y < 1.01) {
-    color = vec4(1, 0, 0, 1);
-    return;
-  }
-  if (pos.y < -0.99 && pos.y > -1.01) {
-    color = vec4(0.5, 0, 0, 1);
-    return;
+  if (scene_pos.x < scene_pos.z) {
+    // Левая часть. Ось x не равна 0
+    x_angle = atan(scene_pos.z / scene_pos.x);
+  } else if (scene_pos.x > -scene_pos.z) {
+    // Правая часть. Ось x не равна 0
+    x_angle = M_PI - atan(-scene_pos.z / scene_pos.x);
+  } else {
+    // Центральная часть. Ось z не равна 0
+    x_angle = M_PI / 2.0f + atan(scene_pos.x / -scene_pos.z);
   }
 
-  color = vec4(0, 0, 0, 0);
+  l_hor = sqrt(scene_pos.x * scene_pos.x + scene_pos.z * scene_pos.z);
+  y_angle = M_PI / 2.0f + atan(scene_pos.y / l_hor);
+
+  color = texture(image, vec2(x_angle / M_PI , y_angle / M_PI));
 }
