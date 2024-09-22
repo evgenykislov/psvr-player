@@ -1,6 +1,7 @@
 #ifndef PLAY_SCREEN_H
 #define PLAY_SCREEN_H
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -14,7 +15,8 @@ class IPlayScreen {
   virtual void Run() = 0;
 
   /*! Установить функцию-фильтр для обработки нажатий кнопок на клавиатуре */
-  virtual void SetKeyboardFilter() = 0;
+  virtual void SetKeyboardFilter(
+      std::function<void(int, int, int, int)> fn) = 0;
 
   /*! Сделать окно как текущее в вызываемом потоке */
   virtual void MakeScreenCurrent() = 0;
@@ -23,7 +25,6 @@ class IPlayScreen {
 
   virtual void GetFrameSize(int& width, int& height) = 0;
   // virtual void DisplayTexture(unsigned int );
-
 };
 
 using IPlayScreenPtr = std::shared_ptr<IPlayScreen>;

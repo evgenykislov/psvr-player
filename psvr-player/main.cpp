@@ -5,6 +5,7 @@
 #include "framepool.h"
 #include "monitors.h"
 #include "play_screen.h"
+#include "playing.h"
 #include "transformer.h"
 #include "version.h"
 #include "video_player.h"
@@ -192,12 +193,13 @@ int main(int argc, char** argv) {
     auto vr = CreateHelmet();
     if (!vr) {
       std::cerr << "PS VR Helmet not found" << std::endl;
-      return 1;
     }
 
-    bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
-    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
-                          : IHelmet::VRMode::kSingleScreen);
+    if (vr) {
+      bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
+      vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
+                            : IHelmet::VRMode::kSingleScreen);
+    }
 
     auto ps = CreatePlayScreen(cmd_screen);
     if (!ps) {
@@ -231,7 +233,9 @@ int main(int argc, char** argv) {
     vp->Play();
 
     if (ps) {
-      ps->SetKeyboardFilter();
+      ps->SetKeyboardFilter([vp](int key, int scancode, int action, int mods) {
+        KeyProcessor(key, scancode, action, mods, vp);
+      });
       ps->Run();
     }
   }
