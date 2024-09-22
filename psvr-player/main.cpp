@@ -1,6 +1,6 @@
 #include <cassert>
 #include <iostream>
-#include <thread> // TODO Remove debug include
+#include <thread>  // TODO Remove debug include
 
 #include "framepool.h"
 #include "monitors.h"
@@ -10,24 +10,24 @@
 #include "video_player.h"
 #include "vr_helmet.h"
 
-
-const char kHelpMessage[] = \
-  "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
-  "Usage:\n"
-  "  psvrplayer [options] command\n"
-  "Commands:\n"
-  "  --listscreens - show list of available screens with their position and exit\n"
-  "  --help - show this help and exit\n"
-  "  --play=<file-name> - play movie from specified file\n"
-  "  --version - show version information and exit\n"
-  "Options:\n"
-  "  --layer=sbs|ou|mono - specify layer configuration\n"
-  "  --screen=<position> - specify screen (by position) to play movie\n"
-  "  --swapcolor - correct color\n"
-  "  --swaplayer - correct order of layers\n"
-  "  --vision=full|semi|flat - specify area of vision\n"
-  "More information see on https://apoheliy.com/psvrplayer/\n"
-  "";
+const char kHelpMessage[] =
+    "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
+    "Usage:\n"
+    "  psvrplayer [options] command\n"
+    "Commands:\n"
+    "  --listscreens - show list of available screens with their position and "
+    "exit\n"
+    "  --help - show this help and exit\n"
+    "  --play=<file-name> - play movie from specified file\n"
+    "  --version - show version information and exit\n"
+    "Options:\n"
+    "  --layer=sbs|ou|mono - specify layer configuration\n"
+    "  --screen=<position> - specify screen (by position) to play movie\n"
+    "  --swapcolor - correct color\n"
+    "  --swaplayer - correct order of layers\n"
+    "  --vision=full|semi|flat - specify area of vision\n"
+    "More information see on https://apoheliy.com/psvrplayer/\n"
+    "";
 
 enum CmdCommand {
   kCommandUnspecified,
@@ -39,11 +39,7 @@ enum CmdCommand {
 
 std::string cmd_play_fname;
 
-enum CmdLayer {
-  kLayerSbs,
-  kLayerOu,
-  kLayerMono
-} cmd_layer = kLayerSbs;
+enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
 
 std::string cmd_screen;
 bool cmd_swap_color = false;
@@ -55,16 +51,13 @@ enum CmdVision {
   kVisionFlat
 } cmd_vision = kVisionSemi;
 
-
-void PrintHelp() {
-  std::cout << kHelpMessage << std::endl;
-}
-
+void PrintHelp() { std::cout << kHelpMessage << std::endl; }
 
 /*! Проверяет аргумент (arg) на соответствие заголовку (header). Если есть
 совпадение, то в параметре tail возвращается  остаток строки.
 \return признак совпадения аргумента и заголовка */
-bool CheckArgument(const std::string& arg, const char* header, std::string& tail) {
+bool CheckArgument(
+    const std::string& arg, const char* header, std::string& tail) {
   std::string h(header);
   if (arg.substr(0, h.size()) != h) {
     return false;
@@ -73,7 +66,6 @@ bool CheckArgument(const std::string& arg, const char* header, std::string& tail
   tail = arg.substr(h.size());
   return true;
 }
-
 
 /*! Разбор командной строки.
 \return признак успешного разбора (без ошибок) */
@@ -92,10 +84,13 @@ bool ParseCmd(int argc, char** argv) {
       }
       cmd_command = kCommandHelp;
     } else if (CheckArgument(arg, "--layer=", tail)) {
-      if (tail == "sbs") { cmd_layer = kLayerSbs; }
-      else if (tail == "ou") { cmd_layer = kLayerOu; }
-      else if (tail == "mono") { cmd_layer = kLayerMono; }
-      else {
+      if (tail == "sbs") {
+        cmd_layer = kLayerSbs;
+      } else if (tail == "ou") {
+        cmd_layer = kLayerOu;
+      } else if (tail == "mono") {
+        cmd_layer = kLayerMono;
+      } else {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
         return false;
       }
@@ -150,10 +145,13 @@ bool ParseCmd(int argc, char** argv) {
       }
       cmd_command = kCommandVersion;
     } else if (CheckArgument(arg, "--vision=", tail)) {
-      if (tail == "full") { cmd_vision = kVisionFull; }
-      else if (tail == "semi") { cmd_vision = kVisionSemi; }
-      else if (tail == "flat") { cmd_vision = kVisionFlat; }
-      else {
+      if (tail == "full") {
+        cmd_vision = kVisionFull;
+      } else if (tail == "semi") {
+        cmd_vision = kVisionSemi;
+      } else if (tail == "flat") {
+        cmd_vision = kVisionFlat;
+      } else {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
         return false;
       }
@@ -164,7 +162,6 @@ bool ParseCmd(int argc, char** argv) {
   }
   return true;
 }
-
 
 int main(int argc, char** argv) {
   if (!ParseCmd(argc, argv)) {
@@ -199,7 +196,8 @@ int main(int argc, char** argv) {
     }
 
     bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
-    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen : IHelmet::VRMode::kSingleScreen);
+    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
+                          : IHelmet::VRMode::kSingleScreen);
 
     auto ps = CreatePlayScreen(cmd_screen);
     if (!ps) {
@@ -211,6 +209,7 @@ int main(int argc, char** argv) {
       return 1;
     }
 
+    trf->SetEyeSwap(cmd_swap_layer);
 
     auto vp = CreateVideoPlayer();
     if (!vp) {
@@ -226,10 +225,8 @@ int main(int argc, char** argv) {
     }
 
     // TODO Remove debug
-    vp->SetDisplayFn([&trf]
-                     (Frame&& frame){
-      trf->SetImage(std::move(frame));
-    });
+    vp->SetDisplayFn(
+        [&trf](Frame&& frame) { trf->SetImage(std::move(frame)); });
 
     vp->Play();
 
