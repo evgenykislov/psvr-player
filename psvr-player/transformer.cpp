@@ -39,6 +39,8 @@ class GlProgramm : public Transformer {
 
   void SetImage(Frame&& frame) override;
   void SetEyeSwap(bool swap) override;
+  void SetViewPoint(float x_disp, float y_disp) override;
+
 
  private:
   GlProgramm() = delete;
@@ -54,6 +56,8 @@ class GlProgramm : public Transformer {
   std::mutex last_frames_lock_;
   bool swap_eyes_setting_;  //!< Настройка по смене порядка изображений для
                             //!< глаз. Настройка под блокировкой update_lock_
+  float x_angle_;
+  float y_angle_;
 
   // Переменная обновления работает в два флага: shutdown_flag_ и не пустой
   // last_frames_ last_frames_ не под блокировкой переменной (update_lock_),
@@ -114,6 +118,12 @@ GlProgramm::GlProgramm(IPlayScreenPtr screen)
   assert(!t.joinable());
 }
 
+
+// TODO Отладка
+static float minx = 0;
+static float maxx = 0;
+
+
 GlProgramm::~GlProgramm() {
   std::unique_lock<std::mutex> lk(update_lock_);
   shutdown_flag_ = true;
@@ -122,6 +132,8 @@ GlProgramm::~GlProgramm() {
   if (transform_thread_.joinable()) {
     transform_thread_.join();
   }
+
+  std::cout << "Mouse x range: " << minx << " - " << maxx << std::endl;
 }
 
 void GlProgramm::SetImage(Frame&& frame) {
@@ -134,6 +146,20 @@ void GlProgramm::SetImage(Frame&& frame) {
 void GlProgramm::SetEyeSwap(bool swap) {
   std::unique_lock<std::mutex> lk(update_lock_);
   swap_eyes_setting_ = swap;
+}
+
+void GlProgramm::SetViewPoint(float x_disp, float y_disp) {
+  std::unique_lock<std::mutex> lk(update_lock_);
+  x_angle_ = x_disp;
+  y_angle_ = y_disp;
+
+  // TODO отладка
+  if (x_angle_ < minx) {
+    minx = x_angle_;
+  }
+  if (x_angle_ > maxx) {
+    maxx = x_angle_;
+  }
 }
 
 void GlProgramm::Processing() {
@@ -180,7 +206,7 @@ void GlProgramm::Processing() {
   }
 
   // Проекционная матрица на квадратное поле зрения
-  projection_matrix_ = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 3.0f);
+  projection_matrix_ = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 3.0f);
 
   // Входная текстура из проигрывателя
   GLuint tx;
@@ -192,6 +218,7 @@ void GlProgramm::Processing() {
 
   while (true) {
     bool swap_eyes;  //!< Локальное значение настройки swap_eyes_setting_
+    float x_angle, y_angle;
     std::unique_lock<std::mutex> lk(update_lock_);
     if (shutdown_flag_) {
       break;
@@ -201,6 +228,8 @@ void GlProgramm::Processing() {
       break;
     }
     swap_eyes = swap_eyes_setting_;
+    x_angle = x_angle_;
+    y_angle = y_angle_;
     lk.unlock();
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
@@ -237,9 +266,11 @@ void GlProgramm::Processing() {
       SplitScreen(tx, left_eye, right_eye, width, align_width);
     }
 
-    glm::mat4 rotation_matrix =
-        glm::rotate(glm::mat4(1.0f), float(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    auto transform = projection_matrix_ * rotation_matrix;
+    glm::mat4 rx =
+        glm::rotate(glm::mat4(1.0f), x_angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 rxy = glm::rotate(rx, y_angle, glm::vec3(1.0f, 0.0f, 0.0f));
+
+    auto transform = projection_matrix_ * rxy;
 
     HalfCilinder(left_eye, left_scene, transform);
     HalfCilinder(right_eye, right_scene, transform);

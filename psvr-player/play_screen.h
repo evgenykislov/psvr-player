@@ -18,6 +18,9 @@ class IPlayScreen {
   virtual void SetKeyboardFilter(
       std::function<void(int, int, int, int)> fn) = 0;
 
+  // TODO ???
+  virtual void SetMouseEvent(std::function<void(double, double)> fn) = 0;
+
   /*! Сделать окно как текущее в вызываемом потоке */
   virtual void MakeScreenCurrent() = 0;
 
