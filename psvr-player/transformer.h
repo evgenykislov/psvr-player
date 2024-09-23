@@ -14,8 +14,12 @@ class Transformer {
 
   // TODO ???
   virtual void SetEyeSwap(bool swap) = 0;
+
+  // TODO ???
+  virtual void SetViewPoint(float x_disp, float y_disp) = 0;
 };
 
+// TODO Сделать shared_ptr
 Transformer* CreateTransformer(IPlayScreenPtr screen);
 
 #endif  // TRANSFORMER_H

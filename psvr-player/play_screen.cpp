@@ -25,6 +25,7 @@ class OpenGLScreen : public IPlayScreen {
 
   void Run() override;
   void SetKeyboardFilter(std::function<void(int, int, int, int)> fn) override;
+  void SetMouseEvent(std::function<void(double, double)> fn) override;
   void MakeScreenCurrent() override;
   void DisplayBuffer() override;
   void GetFrameSize(int& width, int& height) override;
@@ -39,6 +40,7 @@ class OpenGLScreen : public IPlayScreen {
 
   GLFWwindow* window_;
   std::function<void(int, int, int, int)> key_processor_;
+  std::function<void(double, double)> mouse_processor_;
 
   GLFWmonitor* GetMonitor(std::string screen);
   GLFWwindow* CreateWindow(GLFWmonitor* monitor);
@@ -61,6 +63,20 @@ class OpenGLScreen : public IPlayScreen {
     auto scr = reinterpret_cast<OpenGLScreen*>(p);
     if (scr->key_processor_) {
       scr->key_processor_(key, scancode, action, mods);
+    }
+  }
+
+
+  static void OnMouseRaw(GLFWwindow* wnd, double x_pos, double y_pos) {
+    auto p = glfwGetWindowUserPointer(wnd);
+    if (!p) {
+      assert(false);
+      return;
+    }
+
+    auto scr = reinterpret_cast<OpenGLScreen*>(p);
+    if (scr->mouse_processor_) {
+      scr->mouse_processor_(x_pos, y_pos);
     }
   }
 };
@@ -139,6 +155,8 @@ GLFWwindow* OpenGLScreen::CreateWindow(GLFWmonitor* monitor) {
   auto wnd = glfwCreateWindow(
       mode->width, mode->height, "PS VR Player", monitor, NULL);
   glfwSetWindowUserPointer(wnd, reinterpret_cast<void*>(this));
+  glfwSetCursorPosCallback(wnd, OnMouseRaw);
+  glfwSetInputMode(wnd, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
   return wnd;
 }
 
@@ -160,10 +178,18 @@ void OpenGLScreen::Run() {
 
 void OpenGLScreen::SetKeyboardFilter(
     std::function<void(int, int, int, int)> fn) {
+  // TODO lock-lock-lock???
   if (window_) {
-    glfwSetKeyCallback(window_, OnKeyRaw);
+    glfwSetKeyCallback(
+        window_, OnKeyRaw);  // TODO Сделать установку всегда, даже без
+                             // обработчика от пользователя
     key_processor_ = fn;
   }
+}
+
+void OpenGLScreen::SetMouseEvent(std::function<void(double, double)> fn) {
+  // TODO lock-lock-lock???
+  mouse_processor_ = fn;
 }
 
 void OpenGLScreen::MakeScreenCurrent() {
