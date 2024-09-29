@@ -19,8 +19,10 @@
 
 #include "vr_helmet.h"
 
+#include <atomic>
 #include <cassert>
 #include <stdexcept>
+#include <thread>
 
 #include <hidapi/hidapi.h>
 
@@ -35,7 +37,6 @@ class PSVRHelmet: public IHelmet {
   void SetVRMode(VRMode mode) override;
 
 
-
  private:
   PSVRHelmet(const PSVRHelmet&) = delete;
   PSVRHelmet(PSVRHelmet&&) = delete;
@@ -48,7 +49,10 @@ class PSVRHelmet: public IHelmet {
   static const size_t kMaxBufferSize = 128;
 
   unsigned char buffer_[kMaxBufferSize];
-  void* device_; //!< Opened control device with hid_device* type. Or nullptr
+  void* device_;  //!< Opened control device with hid_device* type. Or nullptr
+
+  std::thread read_thread_;  //!< Поток чтения позиции шлема
+  std::atomic_bool shutdown_flag_;  //!< Флаг завершения поток чтения
 
   bool OpenDevice();
   void CloseDevice();
@@ -56,23 +60,27 @@ class PSVRHelmet: public IHelmet {
 
   std::string GetControlDevice();
 
+  void ReadHid();
 };
 
 std::shared_ptr<IHelmet> CreateHelmet() {
   try {
     return std::shared_ptr<PSVRHelmet>(new PSVRHelmet);
-  }
-  catch (...) {
+  } catch (...) {
   }
   return std::shared_ptr<IHelmet>();
 }
 
 
-
 PSVRHelmet::PSVRHelmet(): device_(nullptr) {
+  shutdown_flag_ = false;
   if (!OpenDevice()) {
     throw std::runtime_error("Can't open hid device");
   }
+
+  std::thread t([this]() { ReadHid(); });
+  std::swap(read_thread_, t);
+  assert(!t.joinable());
 }
 
 
@@ -90,9 +98,9 @@ std::string PSVRHelmet::GetControlDevice() {
         res = p;
         break;
       }
+    } catch (std::bad_alloc&) {
+    } catch (std::out_of_range&) {
     }
-    catch (std::bad_alloc&) {}
-    catch (std::out_of_range& ) {}
   }
 
   hid_free_enumeration(devs);
@@ -100,8 +108,23 @@ std::string PSVRHelmet::GetControlDevice() {
   return res;
 }
 
+void PSVRHelmet::ReadHid() {
+  while (true) {
+    if (shutdown_flag_.load(std::memory_order_acquire)) {
+      break;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+}
+
 
 PSVRHelmet::~PSVRHelmet() {
+  shutdown_flag_.store(true, std::memory_order_release);
+  if (read_thread_.joinable()) {
+    read_thread_.join();
+  }
+
   CloseDevice();
 }
 
@@ -130,10 +153,7 @@ void PSVRHelmet::CloseDevice() {
   }
 }
 
-bool PSVRHelmet::IsOpened()
-{
-  return device_;
-}
+bool PSVRHelmet::IsOpened() { return device_; }
 
 void PSVRHelmet::SetVRMode(IHelmet::VRMode mode) {
   SplitScreen(mode == IHelmet::VRMode::kSplitScreen);
