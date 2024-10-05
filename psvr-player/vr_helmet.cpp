@@ -226,6 +226,8 @@ void PSVRHelmet::ReadHid() {
     // Отладочный вывод позиции шлема раз в секунду
     static auto mark =
         std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    static size_t counter = 0;
+    ++counter;
     auto curt = std::chrono::steady_clock::now();
     if (curt >= mark) {
       mark = curt + std::chrono::seconds(1);
@@ -234,7 +236,9 @@ void PSVRHelmet::ReadHid() {
       GetViewPoint(ra, ta, ca);
       std::cout << "Helm angles: right=" << int(ra * 180.0 / kPi)
                 << ", top=" << int(ta * 180.0 / kPi)
-                << ", clockrotation=" << int(ca * 180.0 / kPi) << std::endl;
+                << ", clockrotation=" << int(ca * 180.0 / kPi)
+                << ". Points per second=" << counter << std::endl;
+      counter = 0;
     }
 #endif  // DEBUG_HELMET_VIEW
   }
