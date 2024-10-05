@@ -4,6 +4,8 @@
 #include "framepool.h"
 #include "play_screen.h"
 
+class IHelmet;
+
 /*! Класс для трансформации изображения */
 class Transformer {
  public:
@@ -20,6 +22,7 @@ class Transformer {
 };
 
 // TODO Сделать shared_ptr
-Transformer* CreateTransformer(IPlayScreenPtr screen);
+Transformer* CreateTransformer(
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
 
 #endif  // TRANSFORMER_H
