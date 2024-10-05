@@ -275,14 +275,14 @@ void GlProgramm::Processing() {
       SplitScreen(tx, left_eye, right_eye, width, align_width);
     }
 
-    // Последовательность поворотов: сначала в горизонтальной плоскости
-    // (right_angle), потом подъём (top_angle), потом кручение (roll_angle)
+    // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
+    // в горизонтальной плоскости (right_angle)
     glm::mat4 r1 = glm::rotate(
-        glm::mat4(1.0f), (float)right_angle, glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::vec3 horz = glm::rotate(glm::vec3(0.0f, 0.0f, 1.0f),
-        float(right_angle + kPi), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 r2 = glm::rotate(r1, float(top_angle), horz);
-    glm::mat4 r3 = r2;
+        glm::mat4(1.0f), (float)roll_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 r2 =
+        glm::rotate(r1, float(top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
+    glm::mat4 r3 =
+        glm::rotate(r2, float(right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
     auto transform = projection_matrix_ * r3;
 
