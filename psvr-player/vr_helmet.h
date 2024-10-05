@@ -27,13 +27,17 @@ class IHelmet {
   virtual ~IHelmet() {}
 
   enum class VRMode {
-    kSingleScreen = 0, //!< Плоский экран для 2d фильмов
-    kSplitScreen = 1 //!< Разделение экрана для 3d фильмов
+    kSingleScreen = 0,  //!< Плоский экран для 2d фильмов
+    kSplitScreen = 1  //!< Разделение экрана для 3d фильмов
   };
 
   virtual void SetVRMode(VRMode mode) = 0;
+  virtual void CenterView() = 0;
+  // TODO ?? description
+  virtual void GetViewPoint(
+      double& right_angle, double& top_angle, double& clock_angle) = 0;
 };
 
 std::shared_ptr<IHelmet> CreateHelmet();
 
-#endif // VR_HELMET_H
+#endif  // VR_HELMET_H

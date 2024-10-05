@@ -13,11 +13,13 @@
 
 #include "transformer.h"
 #include "video_player.h"
+#include "vr_helmet.h"
 
 
 int scancode_space_ = 65;
 int scancode_left_arrow_ = 113;
 int scancode_right_arrow_ = 114;
+int scancode_left_ctrl_ = 37;
 
 bool pause_state_ = false;
 
@@ -70,7 +72,7 @@ int GetMovement(MultiKey m) {
 }
 
 void KeyProcessor(int key, int scancode, int action, int mods,
-    std::shared_ptr<IVideoPlayer> player) {
+    std::shared_ptr<IVideoPlayer> player, std::shared_ptr<IHelmet> helmet) {
   std::cout << "Key: " << key << ", scan " << scancode << ", action " << action
             << ", mods " << mods << std::endl;
   if (scancode == scancode_space_ && action == GLFW_PRESS && mods == 0) {
@@ -96,6 +98,11 @@ void KeyProcessor(int key, int scancode, int action, int mods,
     KeyAction(right_arrow_seq_, m);
     player->Move(GetMovement(m));
   }
+
+  if (scancode == scancode_left_ctrl_ && action == GLFW_PRESS && mods == 0 &&
+      helmet) {
+    helmet->CenterView();
+  }
 }
 
 
@@ -110,6 +117,6 @@ void MouseProcessor(double x_pos, double y_pos, Transformer* transformer) {
   last_y = y_pos;
 
   const float kMouseScale = 1.0f / 600.0f;
-  transformer->SetViewPoint(float(x_pos - central_x) * kMouseScale,
-      float(y_pos - central_y) * kMouseScale);
+  //  transformer->SetViewPoint(float(x_pos - central_x) * kMouseScale,
+  //      float(y_pos - central_y) * kMouseScale);
 }

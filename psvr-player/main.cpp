@@ -233,9 +233,10 @@ int main(int argc, char** argv) {
     vp->Play();
 
     if (ps) {
-      ps->SetKeyboardFilter([vp](int key, int scancode, int action, int mods) {
-        KeyProcessor(key, scancode, action, mods, vp);
-      });
+      ps->SetKeyboardFilter(
+          [vp, vr](int key, int scancode, int action, int mods) {
+            KeyProcessor(key, scancode, action, mods, vp, vr);
+          });
       ps->SetMouseEvent([trf](double x_pos, double y_pos) {
         MouseProcessor(x_pos, y_pos, trf);
       });
