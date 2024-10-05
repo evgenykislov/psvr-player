@@ -89,9 +89,6 @@ class PSVRHelmet: public IHelmet {
                              //!< мировых координатах
   vec3d helm_up = vec3d(0.0, 1.0,
       0.0);  //!< Вектор указывает куда смотрит верх шлема в мировых координатах
-  vec3d helm_right =
-      vec3d(1.0, 0.0, 0.0);  //!< Вектор указывает куда смотрит правая сторона
-                             //!< шлема в мировых координатах
   std::mutex helm_axis_lock;
 
   bool OpenDevice();
@@ -107,7 +104,7 @@ class PSVRHelmet: public IHelmet {
   /*! Есть три направления в мировых координатах: вперёд, направо и вверх
   относительно шлема Эту систему координат нужно повернуть на заданные углы
   относительно самих себя */
-  void RotateAxis(vec3d& forward, vec3d& right, vec3d& up, double right_angle,
+  void RotateAxis(vec3d& forward, vec3d& up, double right_angle,
       double top_angle, double clock_angle);
 };
 
@@ -217,9 +214,8 @@ void PSVRHelmet::ReadHid() {
     if (cv) {
       helm_forward = vec3d(0.0, 0.0, 1.0);
       helm_up = vec3d(0.0, 1.0, 0.0);
-      helm_right = vec3d(1.0, 0.0, 0.0);
     } else {
-      RotateAxis(helm_forward, helm_right, helm_up, right_da, top_da, roll_da);
+      RotateAxis(helm_forward, helm_up, right_da, top_da, roll_da);
       auto pv = glm::perp(helm_up, helm_forward);
       helm_up = pv;
     }
@@ -252,9 +248,9 @@ int16_t PSVRHelmet::read_int16(const unsigned char* buffer, int offset) {
   return v;
 }
 
-void PSVRHelmet::RotateAxis(PSVRHelmet::vec3d& forward,
-    PSVRHelmet::vec3d& right, PSVRHelmet::vec3d& up, double right_angle,
-    double top_angle, double clock_angle) {
+void PSVRHelmet::RotateAxis(PSVRHelmet::vec3d& forward, PSVRHelmet::vec3d& up,
+    double right_angle, double top_angle, double clock_angle) {
+  auto right = -glm::cross(forward, up);
   auto fv1 = glm::rotate(forward, glm::radians(right_angle), up);
   auto rv1 = glm::rotate(right, glm::radians(right_angle), up);
   auto fv2 = glm::rotate(fv1, glm::radians(-top_angle), right);
@@ -334,20 +330,22 @@ void PSVRHelmet::GetViewPoint(
   std::unique_lock<std::mutex> lk(helm_axis_lock);
   bool cv = center_view_flag_.exchange(false);
   if (cv) {
+    helm_forward = vec3d(0.0, 0.0, 1.0);
+    helm_up = vec3d(0.0, 1.0, 0.0);
     right_angle = 0.0;
     top_angle = 0.0;
     clock_angle = 0.0;
     return;
   }
 
-  std::cout << "Vectors angles: "
-            << int(glm::angle(helm_right, helm_up) * 180.0 / kPi) << ", "
-            << int(glm::angle(helm_right, helm_forward) * 180.0 / kPi) << ", "
-            << int(glm::angle(helm_forward, helm_up) * 180.0 / kPi)
-            << std::endl;
-
   right_angle = atan2(helm_forward.x, helm_forward.z);
-  top_angle = atan2(helm_forward.y, helm_forward.z);
+  if (helm_forward.y >= 1.0) {
+    top_angle = kPi / 2.0;
+  } else if (helm_forward.y <= -1.0) {
+    top_angle = -kPi / 2.0;
+  } else {
+    top_angle = asin(helm_forward.y);
+  }
 
   auto horz = glm::cross(helm_forward, vec3d(0.0, 1.0, 0.0));
   if (glm::length2(horz) < kNearZeroLength2) {

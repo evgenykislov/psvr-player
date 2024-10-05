@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
       return 1;
     }
 
-    auto trf = CreateTransformer(ps);
+    auto trf = CreateTransformer(ps, vr);
     if (!trf) {
       return 1;
     }

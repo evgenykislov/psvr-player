@@ -21,10 +21,12 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 
 #include "frame_buffer.h"
 #include "play_screen.h"
 #include "shader_program.h"
+#include "vr_helmet.h"
 
 /*! Массив вершин для отрисовки, зарегистрированный как объект в opengl */
 struct VertexArray {
@@ -32,9 +34,13 @@ struct VertexArray {
   unsigned int array_size;  //!< Размер массива, количество вершин в отрисовку
 };
 
-class GlProgramm : public Transformer {
+
+const double kPi = 3.1415926535897932384626433832795;
+
+
+class GlProgramm: public Transformer {
  public:
-  GlProgramm(IPlayScreenPtr screen);
+  GlProgramm(IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
@@ -51,6 +57,7 @@ class GlProgramm : public Transformer {
 
   std::thread transform_thread_;
   IPlayScreenPtr screen_;
+  std::shared_ptr<IHelmet> helmet_;
 
   std::vector<Frame> last_frames_;
   std::mutex last_frames_lock_;
@@ -93,17 +100,19 @@ class GlProgramm : public Transformer {
   bool CreateFlatVertex(VertexArray& vertex);
 };
 
-Transformer* CreateTransformer(IPlayScreenPtr screen) {
+Transformer* CreateTransformer(
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet) {
   try {
-    return new GlProgramm(screen);
+    return new GlProgramm(screen, helmet);
   } catch (...) {
   }
   return nullptr;
 }
 
-GlProgramm::GlProgramm(IPlayScreenPtr screen)
+GlProgramm::GlProgramm(IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet)
     : split_program_(0), half_cilinder_program_(0), swap_eyes_setting_(false) {
   screen_ = screen;
+  helmet_ = helmet;
   shutdown_flag_ = false;
   cube_vertex_.array_id = 0;
   flat_vertex_.array_id = 0;
@@ -218,7 +227,7 @@ void GlProgramm::Processing() {
 
   while (true) {
     bool swap_eyes;  //!< Локальное значение настройки swap_eyes_setting_
-    float x_angle, y_angle;
+    double right_angle, top_angle, roll_angle;
     std::unique_lock<std::mutex> lk(update_lock_);
     if (shutdown_flag_) {
       break;
@@ -228,9 +237,9 @@ void GlProgramm::Processing() {
       break;
     }
     swap_eyes = swap_eyes_setting_;
-    x_angle = x_angle_;
-    y_angle = y_angle_;
     lk.unlock();
+
+    helmet_->GetViewPoint(right_angle, top_angle, roll_angle);
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
     std::vector<Frame> last;
@@ -266,11 +275,16 @@ void GlProgramm::Processing() {
       SplitScreen(tx, left_eye, right_eye, width, align_width);
     }
 
-    glm::mat4 rx =
-        glm::rotate(glm::mat4(1.0f), x_angle, glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 rxy = glm::rotate(rx, y_angle, glm::vec3(1.0f, 0.0f, 0.0f));
+    // Последовательность поворотов: сначала в горизонтальной плоскости
+    // (right_angle), потом подъём (top_angle), потом кручение (roll_angle)
+    glm::mat4 r1 = glm::rotate(
+        glm::mat4(1.0f), (float)right_angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 horz = glm::rotate(glm::vec3(0.0f, 0.0f, 1.0f),
+        float(right_angle + kPi), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 r2 = glm::rotate(r1, float(top_angle), horz);
+    glm::mat4 r3 = r2;
 
-    auto transform = projection_matrix_ * rxy;
+    auto transform = projection_matrix_ * r3;
 
     HalfCilinder(left_eye, left_scene, transform);
     HalfCilinder(right_eye, right_scene, transform);
