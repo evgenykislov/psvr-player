@@ -35,8 +35,7 @@ set(HEADER_FILES
   "vr_helmet.h"
   )
 
-# Additional files. They aren't used in compilation, but showed in project
-set(AUX_FILES
+set(COMPILED_RESOURCES
   "shaders/halfcilinder.frag"
   "shaders/halfcilinder.vert"
   "shaders/output.frag"
@@ -54,8 +53,19 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
+# Resource compiler
+SET(RESOURCE_COMPILER xxd)
+FOREACH(INPUT_FILE ${COMPILED_RESOURCES})
+  SET(OUTPUT_FILE ${INPUT_FILE}.h)
+  ADD_CUSTOM_COMMAND(
+    OUTPUT ${OUTPUT_FILE}
+    COMMAND ${RESOURCE_COMPILER} -i ${INPUT_FILE} ${OUTPUT_FILE}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Compiling ${INPUT_FILE} to binary resource")
+  LIST(APPEND COMPILED_RESOURCES ${OUTPUT_FILE})
+ENDFOREACH()
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES} ${AUX_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES} ${COMPILED_RESOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "glad/include" ".")
 target_link_libraries(${PROJECT_NAME} glfw)
