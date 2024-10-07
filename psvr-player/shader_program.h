@@ -4,7 +4,8 @@
 #include <string>
 
 /*! TODO ??? */
-bool CreateShaderProgram(std::string name, unsigned int& program);
+bool CreateShaderProgram(unsigned int& program, unsigned char* vert_data,
+    unsigned int vert_len, unsigned char* frag_data, unsigned int frag_len);
 
 /*! TODO ??? */
 void DeleteShaderProgram(unsigned int program);

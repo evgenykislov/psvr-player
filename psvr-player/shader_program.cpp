@@ -15,35 +15,9 @@
 #include <GLFW/glfw3.h>
 // clang-format on
 
-enum ShaderType { kVertexShader, kFragmentShader };
 
-std::string LoadShaderText(std::string name, ShaderType shader) {
-  std::stringstream str;
-  str << "../psvr-player/shaders/" << name;
-  switch (shader) {
-    case kVertexShader:
-      str << ".vert";
-      break;
-    case kFragmentShader:
-      str << ".frag";
-      break;
-    default:
-      assert(false);
-      return std::string();
-  }
-
-  std::ifstream f(str.str());
-  std::string line;
-  std::stringstream res;
-  while (f) {
-    std::getline(f, line);
-    res << line << std::endl;
-  }
-
-  return res.str();
-}
-
-bool CreateShaderProgram(std::string name, unsigned int& program) {
+bool CreateShaderProgram(unsigned int& program, unsigned char* vert_data,
+    unsigned int vert_len, unsigned char* frag_data, unsigned int frag_len) {
 #if __cplusplus < 201103L
   // C++11 is not supported
   // Using output_vertex_shader.data() and other .data() can out string without
@@ -52,15 +26,14 @@ bool CreateShaderProgram(std::string name, unsigned int& program) {
 #endif
 
   GLint success;
-  std::string vs = LoadShaderText(name, kVertexShader);
+  std::string vs(vert_data, vert_data + vert_len);
   GLuint vs_i = glCreateShader(GL_VERTEX_SHADER);
   const GLchar* vs_char = vs.data();
   glShaderSource(vs_i, 1, &vs_char, NULL);
   glCompileShader(vs_i);
   glGetShaderiv(vs_i, GL_COMPILE_STATUS, &success);
   if (!success) {
-    std::cerr << "ERROR: compilation vertex shader " << name << " failed"
-              << std::endl;
+    std::cerr << "ERROR: compilation of vertex shader failed" << std::endl;
     GLint log_len;
     glGetShaderiv(vs_i, GL_INFO_LOG_LENGTH, &log_len);
     if (log_len) {
@@ -71,15 +44,14 @@ bool CreateShaderProgram(std::string name, unsigned int& program) {
     return false;
   }
 
-  std::string fs = LoadShaderText(name, kFragmentShader);
+  std::string fs(frag_data, frag_data + frag_len);
   GLuint fs_i = glCreateShader(GL_FRAGMENT_SHADER);
   const GLchar* fs_char = fs.data();
   glShaderSource(fs_i, 1, &fs_char, NULL);
   glCompileShader(fs_i);
   glGetShaderiv(fs_i, GL_COMPILE_STATUS, &success);
   if (!success) {
-    std::cerr << "ERROR: compilation fragment shader " << name << " failed"
-              << std::endl;
+    std::cerr << "ERROR: compilation of fragment shader failed" << std::endl;
     GLint log_len;
     glGetShaderiv(fs_i, GL_INFO_LOG_LENGTH, &log_len);
     if (log_len) {
@@ -97,8 +69,7 @@ bool CreateShaderProgram(std::string name, unsigned int& program) {
   glLinkProgram(ps_i);
   glGetProgramiv(ps_i, GL_LINK_STATUS, &success);
   if (!success) {
-    std::cerr << "ERROR: compilation shader program " << name << " failed"
-              << std::endl;
+    std::cerr << "ERROR: compilation of shader program failed" << std::endl;
     GLint log_len;
     glGetProgramiv(ps_i, GL_INFO_LOG_LENGTH, &log_len);
     if (log_len) {

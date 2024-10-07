@@ -27,6 +27,13 @@
 #include "play_screen.h"
 #include "shader_program.h"
 #include "vr_helmet.h"
+#include "shaders/halfcilinder.vert.h"
+#include "shaders/halfcilinder.frag.h"
+#include "shaders/output.vert.h"
+#include "shaders/output.frag.h"
+#include "shaders/split.vert.h"
+#include "shaders/split.frag.h"
+
 
 /*! Массив вершин для отрисовки, зарегистрированный как объект в opengl */
 struct VertexArray {
@@ -193,16 +200,21 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't initialize scene framebuffers");
   }
 
-  if (!CreateShaderProgram("split", split_program_)) {
+  if (!CreateShaderProgram(split_program_, shaders_split_vert,
+          shaders_split_vert_len, shaders_split_frag, shaders_split_frag_len)) {
     throw std::runtime_error("Can't create split program");
   }
 
-  if (!CreateShaderProgram("halfcilinder", half_cilinder_program_)) {
+  if (!CreateShaderProgram(half_cilinder_program_, shaders_halfcilinder_vert,
+          shaders_halfcilinder_vert_len, shaders_halfcilinder_frag,
+          shaders_halfcilinder_frag_len)) {
     throw std::runtime_error("Can't create half cilinder program");
   }
 
   unsigned int output_program;
-  if (!CreateShaderProgram("output", output_program)) {
+  if (!CreateShaderProgram(output_program, shaders_output_vert,
+          shaders_output_vert_len, shaders_output_frag,
+          shaders_output_frag_len)) {
     throw std::runtime_error("Can't create output program");
   }
 
