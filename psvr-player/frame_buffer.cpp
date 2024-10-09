@@ -44,6 +44,8 @@ bool CreateFrameBuffer(FrameBuffer& buffer) {
 }
 
 void DeleteFrameBuffer(FrameBuffer& buffer) {
-  // TODO implement
-  // destory texture and frame buffer
+  glDeleteTextures(1, &buffer.texture);
+  buffer.texture = 0;
+  glDeleteFramebuffers(1, &buffer.buffer);
+  buffer.buffer = 0;
 }
