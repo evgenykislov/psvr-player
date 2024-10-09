@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -18,7 +19,7 @@ const int kDefaultQuitScancode =
         //! клавиши в glfw определяются как неподдерживаемые)
 int quit_scancode_ = kDefaultQuitScancode;
 
-class OpenGLScreen : public IPlayScreen {
+class OpenGLScreen: public IPlayScreen {
  public:
   OpenGLScreen(std::string screen);
   virtual ~OpenGLScreen();
@@ -41,6 +42,8 @@ class OpenGLScreen : public IPlayScreen {
   GLFWwindow* window_;
   std::function<void(int, int, int, int)> key_processor_;
   std::function<void(double, double)> mouse_processor_;
+  std::mutex
+      processor_lock_;  //!< Блокировка на использование/изменение обработчиков
 
   GLFWmonitor* GetMonitor(std::string screen);
   GLFWwindow* CreateWindow(GLFWmonitor* monitor);
@@ -61,9 +64,11 @@ class OpenGLScreen : public IPlayScreen {
     }
 
     auto scr = reinterpret_cast<OpenGLScreen*>(p);
+    std::unique_lock<std::mutex> lk(scr->processor_lock_);
     if (scr->key_processor_) {
       scr->key_processor_(key, scancode, action, mods);
     }
+    lk.unlock();
   }
 
 
@@ -75,9 +80,11 @@ class OpenGLScreen : public IPlayScreen {
     }
 
     auto scr = reinterpret_cast<OpenGLScreen*>(p);
+    std::unique_lock<std::mutex> lk(scr->processor_lock_);
     if (scr->mouse_processor_) {
       scr->mouse_processor_(x_pos, y_pos);
     }
+    lk.unlock();
   }
 };
 
@@ -92,7 +99,7 @@ IPlayScreenPtr CreatePlayScreen(std::string screen) {
 }
 
 
-OpenGLScreen::OpenGLScreen(std::string screen) : window_(nullptr) {
+OpenGLScreen::OpenGLScreen(std::string screen): window_(nullptr) {
   if (!glfwInit()) {
     throw std::runtime_error("Can't initialize GLFW library");
   }
@@ -106,16 +113,16 @@ OpenGLScreen::OpenGLScreen(std::string screen) : window_(nullptr) {
       throw std::runtime_error("Can't create window for screen");
     }
 
+    auto phk = glfwSetKeyCallback(window_, OnKeyRaw);
+    assert(!phk);
+    auto phm = glfwSetCursorPosCallback(window_, OnMouseRaw);
+    assert(!phm);
+
+
     auto sc = glfwGetKeyScancode(GLFW_KEY_ESCAPE);
     if (sc != -1) {
       quit_scancode_ = sc;
     }
-
-    // TODO Debug code
-    int width, height;
-    glfwGetWindowSize(window_, &width, &height);
-    std::cout << "Created window with size: " << width << "x" << height
-              << std::endl;
   } catch (...) {
     glfwTerminate();
     throw;
@@ -155,7 +162,6 @@ GLFWwindow* OpenGLScreen::CreateWindow(GLFWmonitor* monitor) {
   auto wnd = glfwCreateWindow(
       mode->width, mode->height, "PS VR Player", monitor, NULL);
   glfwSetWindowUserPointer(wnd, reinterpret_cast<void*>(this));
-  glfwSetCursorPosCallback(wnd, OnMouseRaw);
   glfwSetInputMode(wnd, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
   return wnd;
 }
@@ -178,25 +184,17 @@ void OpenGLScreen::Run() {
 
 void OpenGLScreen::SetKeyboardFilter(
     std::function<void(int, int, int, int)> fn) {
-  // TODO lock-lock-lock???
-  if (window_) {
-    glfwSetKeyCallback(
-        window_, OnKeyRaw);  // TODO Сделать установку всегда, даже без
-                             // обработчика от пользователя
-    key_processor_ = fn;
-  }
+  std::lock_guard<std::mutex> lk(processor_lock_);
+  key_processor_ = fn;
 }
 
 void OpenGLScreen::SetMouseEvent(std::function<void(double, double)> fn) {
-  // TODO lock-lock-lock???
+  std::lock_guard<std::mutex> lk(processor_lock_);
   mouse_processor_ = fn;
 }
 
 void OpenGLScreen::MakeScreenCurrent() {
-  if (!window_) {
-    return;  // TODO Error processing
-  }
-
+  assert(window_);
   glfwMakeContextCurrent(window_);
 }
 
