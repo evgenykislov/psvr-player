@@ -19,6 +19,8 @@ set(SOURCE_FILES
   "transformer.cpp"
   "video_player.cpp"
   "vr_helmet.cpp"
+  "vr_helmet_calibration.cpp"
+  "vr_helmet_hid.cpp"
   "glad/src/glad.c"
   )
 
@@ -33,6 +35,8 @@ set(HEADER_FILES
   "version.h"
   "video_player.h"
   "vr_helmet.h"
+  "vr_helmet_calibration.h"
+  "vr_helmet_hid.h"
   )
 
 set(COMPILED_RESOURCES
