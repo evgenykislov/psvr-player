@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
     return PrintMonitors();
   }
   if (cmd_command == kCommandPlay) {
-    auto vr = CreateHelmet();
+    auto vr = CreateHelmetView();
     if (!vr) {
       std::cerr << "PS VR Helmet not found" << std::endl;
     }

@@ -21,6 +21,7 @@ set(SOURCE_FILES
   "vr_helmet.cpp"
   "vr_helmet_calibration.cpp"
   "vr_helmet_hid.cpp"
+  "vr_helmet_view.cpp"
   "glad/src/glad.c"
   )
 
@@ -37,6 +38,7 @@ set(HEADER_FILES
   "vr_helmet.h"
   "vr_helmet_calibration.h"
   "vr_helmet_hid.h"
+  "vr_helmet_view.h"
   )
 
 set(COMPILED_RESOURCES

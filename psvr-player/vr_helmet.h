@@ -38,6 +38,8 @@ class IHelmet {
       double& right_angle, double& top_angle, double& clock_angle) = 0;
 };
 
-std::shared_ptr<IHelmet> CreateHelmet();
+std::shared_ptr<IHelmet> CreateHelmetView();
+
+std::shared_ptr<IHelmet> CreateHelmetCalibration();
 
 #endif  // VR_HELMET_H
