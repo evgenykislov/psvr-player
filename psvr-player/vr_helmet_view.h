@@ -17,7 +17,7 @@
 #include "vr_helmet_hid.h"
 
 
-class PsvrHelmetView: public IHelmet {
+class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
  public:
   PsvrHelmetView();
   virtual ~PsvrHelmetView();
@@ -29,6 +29,10 @@ class PsvrHelmetView: public IHelmet {
   void GetViewPoint(
       double& right_angle, double& top_angle, double& clock_angle) override;
 
+ protected:
+  virtual void OnSensorsData(double to_right, double to_top,
+      double to_clockwork, uint64_t mcs_time) override;
+
  private:
   PsvrHelmetView(const PsvrHelmetView&) = delete;
   PsvrHelmetView(PsvrHelmetView&&) = delete;
@@ -37,27 +41,13 @@ class PsvrHelmetView: public IHelmet {
 
   using vec3d = glm::vec<3, double, glm::defaultp>;
 
-  const unsigned short kPsvrVendorID = 0x054c;
-  const unsigned short kPsvrProductID = 0x09af;
-  const char kPSVRControlInterface[4] = ":05";
-  const char kPSVRSensorsInterface[4] = ":04";
-  static const size_t kMaxBufferSize = 128;
-  static const int kReadTimeout =
-      10;  //!< Таймаут на чтение данных из hid-устройства
-  const double kAccelerationScale = 0.00003125;
   const double kNearZeroLength2 =
       1.0e-8;  //!< Длина очень короткого вектора. При расчётах углов означает
                //!< взгляд ровно вверх или вниз
 
 
-  unsigned char buffer_[kMaxBufferSize];
-  std::atomic<void*>
-      device_1;  //!< Opened control device with hid_device* type. Or nullptr
-  std::atomic<void*> sensors_;  //!< Устройство-сенсоры шлема
-
-  std::thread read_thread_;  //!< Поток чтения позиции шлема
-  std::atomic_bool shutdown_flag_;  //!< Флаг завершения поток чтения
   std::atomic_bool center_view_flag_;
+  uint64_t last_sensor_time_;
 
   vec3d helm_forward =
       vec3d(0.0, 0.0, 1.0);  //!< Вектор указывает куда смотрит (вперёд) шлем в
@@ -65,16 +55,6 @@ class PsvrHelmetView: public IHelmet {
   vec3d helm_up = vec3d(0.0, 1.0,
       0.0);  //!< Вектор указывает куда смотрит верх шлема в мировых координатах
   std::mutex helm_axis_lock;
-
-  bool OpenDevice();
-  void CloseDevice();
-  bool SplitScreen(bool split_mode);
-
-  bool GetHidNames(std::string& control, std::string& sensors);
-
-  void ReadHid();
-
-  static int16_t read_int16(const unsigned char* buffer, int offset);
 
   /*! Есть три направления в мировых координатах: вперёд, направо и вверх
   относительно шлема Эту систему координат нужно повернуть на заданные углы
