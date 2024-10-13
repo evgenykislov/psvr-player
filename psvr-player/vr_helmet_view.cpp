@@ -16,13 +16,36 @@
 
 #include <hidapi/hidapi.h>
 
+#include "iniparser.h"
+
+
 #define DEBUG_HELMET_VIEW
 
 const double kPi = 3.1415926535897932384626433832795;
 
+// TODO Detects home directory and generate correct configuration file name
+const char kConfigFileName[] = "/tmp/psvrplayer.cfg";
+
 PsvrHelmetView::PsvrHelmetView() {
   center_view_flag_ = true;
   last_sensor_time_ = std::numeric_limits<uint64_t>::max();
+
+  std::unique_lock<std::mutex> vl(velo_lock_);
+  auto dict = iniparser_load(kConfigFileName);
+  if (dict) {
+    right_velo_ = double(iniparser_getint64(dict, "Calibration:right", 0)) /
+                  kFixedPointFactor;
+    top_velo_ = double(iniparser_getint64(dict, "Calibration:top", 0)) /
+                kFixedPointFactor;
+    clock_velo_ = double(iniparser_getint64(dict, "Calibration:clock", 0)) /
+                  kFixedPointFactor;
+    iniparser_freedict(dict);
+  } else {
+    right_velo_ = 0.0;
+    top_velo_ = 0.0;
+    clock_velo_ = 0.0;
+  }
+  vl.unlock();
 }
 
 
@@ -35,14 +58,11 @@ void PsvrHelmetView::OnSensorsData(
   double ims = (mcs_time - last_sensor_time_) * 0.001;
   last_sensor_time_ = mcs_time;
 
-  // TODO Make calibration
-  double right_velo_ = +0.00008;
-  double top_velo_ = -0.000645;
-  double roll_velo_ = -0.00021;
-
+  std::unique_lock<std::mutex> vl(velo_lock_);
   double right_da = (to_right - right_velo_) * ims;
   double top_da = (to_top - top_velo_) * ims;
-  double roll_da = (to_clockwork - roll_velo_) * ims;
+  double roll_da = (to_clockwork - clock_velo_) * ims;
+  vl.unlock();
 
   std::unique_lock<std::mutex> lk(helm_axis_lock);
   bool cv = center_view_flag_.exchange(false);

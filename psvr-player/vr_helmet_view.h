@@ -44,6 +44,7 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
   const double kNearZeroLength2 =
       1.0e-8;  //!< Длина очень короткого вектора. При расчётах углов означает
                //!< взгляд ровно вверх или вниз
+  const int64_t kFixedPointFactor = 1000000000L;
 
 
   std::atomic_bool center_view_flag_;
@@ -55,6 +56,12 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
   vec3d helm_up = vec3d(0.0, 1.0,
       0.0);  //!< Вектор указывает куда смотрит верх шлема в мировых координатах
   std::mutex helm_axis_lock;
+
+  double right_velo_;  //!< Скорость "дрейфа" шлема вправо (из калибровки)
+  double top_velo_;  //!< Скорость "дрейфа" шлема вверх (из калибровки)
+  double clock_velo_;  //!< Скорость "дрейфа" шлема по часовой стрелке (из
+                       //!< калибровки)
+  std::mutex velo_lock_;
 
   /*! Есть три направления в мировых координатах: вперёд, направо и вверх
   относительно шлема Эту систему координат нужно повернуть на заданные углы

@@ -61,7 +61,7 @@ PsvrHelmetCalibration::~PsvrHelmetCalibration() {
     res = res && (iniparser_set(dict, "Calibration", nullptr) == 0);
     res = res && (iniparser_set(dict, "Calibration:right", str.c_str()) == 0);
     res = res && (iniparser_set(dict, "Calibration:top", stt.c_str()) == 0);
-    res = res && (iniparser_set(dict, "Calibration:roll", stc.c_str()) == 0);
+    res = res && (iniparser_set(dict, "Calibration:clock", stc.c_str()) == 0);
     if (!res) {
       std::cerr << "Can't generate configuration file. Calibration failed"
                 << std::endl;
