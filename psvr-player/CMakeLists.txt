@@ -19,6 +19,9 @@ set(SOURCE_FILES
   "transformer.cpp"
   "video_player.cpp"
   "vr_helmet.cpp"
+  "vr_helmet_calibration.cpp"
+  "vr_helmet_hid.cpp"
+  "vr_helmet_view.cpp"
   "glad/src/glad.c"
   )
 
@@ -33,6 +36,9 @@ set(HEADER_FILES
   "version.h"
   "video_player.h"
   "vr_helmet.h"
+  "vr_helmet_calibration.h"
+  "vr_helmet_hid.h"
+  "vr_helmet_view.h"
   )
 
 set(COMPILED_RESOURCES
@@ -53,6 +59,8 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
+include_directories(../libs/iniparser/src)
+
 # Resource compiler
 SET(RESOURCE_COMPILER xxd)
 FOREACH(INPUT_FILE ${COMPILED_RESOURCES})
@@ -60,7 +68,7 @@ FOREACH(INPUT_FILE ${COMPILED_RESOURCES})
   ADD_CUSTOM_COMMAND(
     OUTPUT ${OUTPUT_FILE}
     COMMAND ${RESOURCE_COMPILER} -i ${INPUT_FILE} ${OUTPUT_FILE}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Compiling ${INPUT_FILE} to binary resource")
   LIST(APPEND COMPILED_RESOURCES ${OUTPUT_FILE})
 ENDFOREACH()
@@ -72,3 +80,4 @@ target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
 target_link_libraries(${PROJECT_NAME} ${HIDAPI_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
+target_link_libraries(${PROJECT_NAME} iniparser-static)

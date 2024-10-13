@@ -11,6 +11,11 @@
 #include "video_player.h"
 #include "vr_helmet.h"
 
+const int kCalibrationTimeout =
+    20;  //!< Интервал калибровки сенсоров шлема, в секундах
+
+// TODO Add calibration command
+
 const char kHelpMessage[] =
     "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
     "Usage:\n"
@@ -35,7 +40,8 @@ enum CmdCommand {
   kCommandListScreen,
   kCommandHelp,
   kCommandPlay,
-  kCommandVersion
+  kCommandVersion,
+  kCommandCalibration
 } cmd_command = kCommandUnspecified;
 
 std::string cmd_play_fname;
@@ -105,6 +111,16 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_command = kCommandListScreen;
+    } else if (CheckArgument(arg, "--calibration", tail)) {
+      if (!tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      if (cmd_command != kCommandUnspecified) {
+        std::cerr << "Extra command '" << arg << "'" << std::endl;
+        return false;
+      }
+      cmd_command = kCommandCalibration;
     } else if (CheckArgument(arg, "--play=", tail)) {
       if (tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -189,8 +205,15 @@ int main(int argc, char** argv) {
   if (cmd_command == kCommandListScreen) {
     return PrintMonitors();
   }
+
+  if (cmd_command == kCommandCalibration) {
+    auto vr = CreateHelmetCalibration();
+    std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
+    return 0;
+  }
+
   if (cmd_command == kCommandPlay) {
-    auto vr = CreateHelmet();
+    auto vr = CreateHelmetView();
     if (!vr) {
       std::cerr << "PS VR Helmet not found" << std::endl;
     }
