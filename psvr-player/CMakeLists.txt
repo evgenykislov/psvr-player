@@ -59,6 +59,8 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
+include_directories(../libs/iniparser/src)
+
 # Resource compiler
 SET(RESOURCE_COMPILER xxd)
 FOREACH(INPUT_FILE ${COMPILED_RESOURCES})
@@ -78,3 +80,4 @@ target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
 target_link_libraries(${PROJECT_NAME} ${HIDAPI_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
+target_link_libraries(${PROJECT_NAME} iniparser-static)
