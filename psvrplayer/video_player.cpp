@@ -22,7 +22,7 @@
 
 /*! Класс для проигрывания видеофайла: открывает файл, выдаёт очередной кадр,
 позволяет управлять потоком воспроизведения (пауза/стоп/перемотка) */
-class VideoPlayer : public IVideoPlayer {
+class VideoPlayer: public IVideoPlayer {
  public:
   VideoPlayer();
   virtual ~VideoPlayer();
@@ -48,6 +48,9 @@ class VideoPlayer : public IVideoPlayer {
   const size_t kFramePoolSizeAlarm =
       10;  //!< Количество кадров в обработке, когда уже начинается сигнализация
            //!< переполнения
+  const unsigned int kLastPlayChunk =
+      1000;  //!< Последний кусочек проигрывания перед завершением файла, в
+             //!< миллисекундах
 
   libvlc_instance_t* lib_vlc_;
   libvlc_media_t* movie_media_;
@@ -314,20 +317,47 @@ void VideoPlayer::Move(int movement) {
   if (len == -1) {
     return;
   }
+  auto last_chunk_pos = len - kLastPlayChunk;
   auto cur = libvlc_media_player_get_time(movie_player_);
   if (cur == -1) {
     return;
   }
 
-  cur += static_cast<libvlc_time_t>(movement) * 1000;
-  if (cur < 0) {
-    cur = 0;
-  }
-  if (cur > len) {
-    cur = len;
+  auto newpos = cur + static_cast<libvlc_time_t>(movement) * 1000;
+  if (newpos < 0) {
+    newpos = 0;
   }
 
-  libvlc_media_player_set_time(movie_player_, cur);
+  if (newpos > last_chunk_pos) {
+    if (cur < last_chunk_pos) {
+      newpos = last_chunk_pos;
+    } else {
+      // Мы уже стоим/проигрываем в конце файла и хотим скакнуть ещё вперёд
+      // В общем, никуда скакать не будем
+      newpos = cur;
+    }
+  }
+
+  if (newpos == cur) {
+    // Позиция не меняется. Обычно это происходит по окончании фильма
+    return;
+  }
+
+  if (!libvlc_media_player_is_playing(movie_player_)) {
+    libvlc_media_player_set_media(movie_player_, nullptr);
+    libvlc_media_player_set_media(movie_player_, movie_media_);
+    int res = libvlc_media_player_play(movie_player_);
+    if (res) {
+      std::cerr << "ERROR: Can't restart movie playing" << std::endl;
+      const char* msg = libvlc_errmsg();
+      if (msg) {
+        std::cerr << "  Description: " << msg << std::endl;
+      }
+      return;
+    }
+  }
+
+  libvlc_media_player_set_time(movie_player_, newpos);
 }
 
 

@@ -35,4 +35,4 @@
 *.txt.user
 *.md.backup
 
-/psvr-player/shaders/*.h
+/psvrplayer/shaders/*.h
