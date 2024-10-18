@@ -22,7 +22,7 @@
 
 /*! Класс для проигрывания видеофайла: открывает файл, выдаёт очередной кадр,
 позволяет управлять потоком воспроизведения (пауза/стоп/перемотка) */
-class VideoPlayer : public IVideoPlayer {
+class VideoPlayer: public IVideoPlayer {
  public:
   VideoPlayer();
   virtual ~VideoPlayer();
@@ -319,15 +319,34 @@ void VideoPlayer::Move(int movement) {
     return;
   }
 
-  cur += static_cast<libvlc_time_t>(movement) * 1000;
-  if (cur < 0) {
-    cur = 0;
+  auto newpos = cur + static_cast<libvlc_time_t>(movement) * 1000;
+  if (newpos < 0) {
+    newpos = 0;
   }
-  if (cur > len) {
-    cur = len;
+  if (newpos > len) {
+    newpos = len;
   }
 
-  libvlc_media_player_set_time(movie_player_, cur);
+  if (newpos == cur) {
+    // Позиция не меняется. Обычно это происходит по окончании фильма
+    return;
+  }
+
+  if (!libvlc_media_player_is_playing(movie_player_)) {
+    libvlc_media_player_set_media(movie_player_, nullptr);
+    libvlc_media_player_set_media(movie_player_, movie_media_);
+    int res = libvlc_media_player_play(movie_player_);
+    if (res) {
+      std::cerr << "ERROR: Can't restart movie playing" << std::endl;
+      const char* msg = libvlc_errmsg();
+      if (msg) {
+        std::cerr << "  Description: " << msg << std::endl;
+      }
+      return;
+    }
+  }
+
+  libvlc_media_player_set_time(movie_player_, newpos);
 }
 
 
