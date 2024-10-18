@@ -48,6 +48,9 @@ class VideoPlayer: public IVideoPlayer {
   const size_t kFramePoolSizeAlarm =
       10;  //!< Количество кадров в обработке, когда уже начинается сигнализация
            //!< переполнения
+  const unsigned int kLastPlayChunk =
+      1000;  //!< Последний кусочек проигрывания перед завершением файла, в
+             //!< миллисекундах
 
   libvlc_instance_t* lib_vlc_;
   libvlc_media_t* movie_media_;
@@ -314,6 +317,7 @@ void VideoPlayer::Move(int movement) {
   if (len == -1) {
     return;
   }
+  auto last_chunk_pos = len - kLastPlayChunk;
   auto cur = libvlc_media_player_get_time(movie_player_);
   if (cur == -1) {
     return;
@@ -323,8 +327,15 @@ void VideoPlayer::Move(int movement) {
   if (newpos < 0) {
     newpos = 0;
   }
-  if (newpos > len) {
-    newpos = len;
+
+  if (newpos > last_chunk_pos) {
+    if (cur < last_chunk_pos) {
+      newpos = last_chunk_pos;
+    } else {
+      // Мы уже стоим/проигрываем в конце файла и хотим скакнуть ещё вперёд
+      // В общем, никуда скакать не будем
+      newpos = cur;
+    }
   }
 
   if (newpos == cur) {
