@@ -17,21 +17,22 @@
 #include <hidapi/hidapi.h>
 
 #include "iniparser.h"
+#include "home-dir.h"
 
 
 #define DEBUG_HELMET_VIEW
 
 const double kPi = 3.1415926535897932384626433832795;
 
-// TODO Detects home directory and generate correct configuration file name
-const char kConfigFileName[] = "/tmp/psvrplayer.cfg";
+const char kConfigFileName[] = "/psvrplayer.cfg";
 
 PsvrHelmetView::PsvrHelmetView() {
   center_view_flag_ = true;
   last_sensor_time_ = std::numeric_limits<uint64_t>::max();
 
+  auto cfg = HomeDirLibrary::GetDataDir() + kConfigFileName;
   std::unique_lock<std::mutex> vl(velo_lock_);
-  auto dict = iniparser_load(kConfigFileName);
+  auto dict = iniparser_load(cfg.c_str());
   if (dict) {
     right_velo_ = double(iniparser_getint64(dict, "Calibration:right", 0)) /
                   kFixedPointFactor;

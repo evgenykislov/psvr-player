@@ -23,6 +23,7 @@ set(SOURCE_FILES
   "vr_helmet_hid.cpp"
   "vr_helmet_view.cpp"
   "glad/src/glad.c"
+  "../libs/home-dir/home-dir.cpp"
   )
 
 set(HEADER_FILES
@@ -39,6 +40,7 @@ set(HEADER_FILES
   "vr_helmet_calibration.h"
   "vr_helmet_hid.h"
   "vr_helmet_view.h"
+  "../libs/home-dir/home-dir.h"
   )
 
 set(COMPILED_RESOURCES
@@ -60,6 +62,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
 include_directories(../libs/iniparser/src)
+include_directories(../libs/home-dir)
 
 # Resource compiler
 SET(RESOURCE_COMPILER xxd)

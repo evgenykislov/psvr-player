@@ -30,6 +30,9 @@ class PsvrHelmetCalibration: public IHelmet, PsvrHelmetHid {
   int64_t to_clockwork_summ_;
   int64_t data_counter_;
   std::mutex data_lock_;
+
+  // Путь к файлу с конфигурационными данными
+  std::string config_fname_;
 };
 
 #endif  // PSVRHELMETCALIBRATION_H

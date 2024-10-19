@@ -7,25 +7,33 @@
 #include <errno.h>
 
 #include "iniparser.h"
+#include "home-dir.h"
 
-// TODO Detects home directory and generate correct configuration file name
-const char kConfigFileName[] = "/tmp/psvrplayer.cfg";
+const char kConfigFileName[] = "/psvrplayer.cfg";
 
 PsvrHelmetCalibration::PsvrHelmetCalibration()
     : to_right_summ_(0),
       to_top_summ_(0),
       to_clockwork_summ_(0),
       data_counter_(0) {
+  config_fname_ = HomeDirLibrary::GetDataDir();
+  if (config_fname_.empty()) {
+    // Путь для конфигурационных данных неопределён
+    std::cerr
+        << "ERROR: Can't get folder for configuration file. Calibration failed"
+        << std::endl;
+    throw std::runtime_error("Can't get data folder ");
+  }
+  config_fname_ += kConfigFileName;
   // Create configuration file if it don't exist
-  std::ifstream f1(kConfigFileName, std::ios_base::in);
+  std::ifstream f1(config_fname_, std::ios_base::in);
   if (!f1) {
-    std::ofstream f2(
-        kConfigFileName, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream f2(config_fname_, std::ios_base::out | std::ios_base::trunc);
     if (f2.is_open()) {
       f2 << "# ps vr player configuration file" << std::endl;
     } else {
       // Файл не существует и создать его нельзя
-      std::cerr << "ERROR: Can't create configuration file '" << kConfigFileName
+      std::cerr << "ERROR: Can't create configuration file '" << config_fname_
                 << "'. Calibration failed" << std::endl;
       throw std::runtime_error("Can't create configuration file");
     }
@@ -49,7 +57,7 @@ PsvrHelmetCalibration::~PsvrHelmetCalibration() {
     return;
   }
 
-  auto dict = iniparser_load(kConfigFileName);
+  auto dict = iniparser_load(config_fname_.c_str());
   if (!dict) {
     std::cerr << "Can't parse configuration file. Calibration failed"
               << std::endl;
@@ -66,9 +74,9 @@ PsvrHelmetCalibration::~PsvrHelmetCalibration() {
       std::cerr << "Can't generate configuration file. Calibration failed"
                 << std::endl;
     } else {
-      auto f = fopen(kConfigFileName, "w+");
+      auto f = fopen(config_fname_.c_str(), "w+");
       if (!f) {
-        std::cerr << "Can't open configuration file '" << kConfigFileName
+        std::cerr << "Can't open configuration file '" << config_fname_
                   << "'. Calibration failed" << std::endl;
       } else {
         iniparser_dump_ini(dict, f);
