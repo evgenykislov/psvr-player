@@ -1,4 +1,7 @@
+
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
 #include <iostream>
 #include <thread>  // TODO Remove debug include
 
@@ -215,7 +218,7 @@ int DoPlayCommand() {
     return 1;
   }
 
-  auto trf = CreateTransformer(ps, vr);
+  auto trf = CreateTransformer(kLeftRight180, ps, vr);
   if (!trf) {
     return 1;
   }
@@ -257,6 +260,80 @@ int DoPlayCommand() {
 }
 
 
+/*! Выполнить команду show
+\return код возврата. 0 - если нет ошибок */
+int DoShowCommand() {
+  auto vr = CreateHelmetView();
+  if (!vr) {
+    std::cerr << "PS VR Helmet not found" << std::endl;
+  } else {
+    vr->SetVRMode(IHelmet::VRMode::kSplitScreen);
+  }
+
+  auto ps = CreatePlayScreen(cmd_screen);
+  if (!ps) {
+    return 1;
+  }
+
+  auto trf = CreateTransformer(kSingleImage, ps, vr);
+  if (!trf) {
+    return 1;
+  }
+
+  std::atomic_bool stop_show(false);
+  std::condition_variable stop_var;
+  std::thread show_thread([&stop_show, &stop_var, trf]() {
+    int r, g, b;
+    r = g = b = 128;
+    int fast_cycle_counter = 20;  //!< Счётчик частых показов (на старте)
+    try {
+      while (true) {
+        std::mutex m;
+        std::unique_lock<std::mutex> lk(m);
+        stop_var.wait_for(
+            lk, std::chrono::milliseconds(fast_cycle_counter > 0 ? 100 : 3000));
+        if (fast_cycle_counter > 0) {
+          --fast_cycle_counter;
+        }
+
+        if (stop_show) {
+          break;
+        }
+
+        auto f = RequestFrame(1000, 1000);
+        f.SetSize(1000, 1000);
+
+        for (int width = 250; width <= 1000; width += 250) {
+          f.DrawRectangle(
+              500 - width / 2, 500 - width / 2, width, 25, r, g, b, 255);
+          f.DrawRectangle(
+              500 - width / 2, 475 + width / 2, width, 25, r, g, b, 255);
+          f.DrawRectangle(
+              500 - width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+          f.DrawRectangle(
+              475 + width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+        }
+
+        trf->SetImage(std::move(f));
+      }
+    } catch (std::exception) {
+      std::cerr << "Can't create show frame" << std::endl;
+    }
+  });
+
+  assert(ps);
+  ps->Run();
+
+  stop_show = true;
+  stop_var.notify_all();
+  show_thread.join();
+
+  // TODO Сделать корректное освобождение ресурсов
+  // delete trf;
+  return 0;
+}
+
+
 int main(int argc, char** argv) {
   if (!ParseCmd(argc, argv)) {
     std::cerr << "-----" << std::endl;
@@ -288,7 +365,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (cmd_command == kCommandShow) {
-    std::cerr << "TODO Not implemented yet" << std::endl;
+    DoShowCommand();
     return 0;
   }
   if (cmd_command == kCommandPlay) {
