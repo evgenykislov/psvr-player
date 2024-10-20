@@ -44,7 +44,8 @@ Frame::Frame(int align_width, int align_height) {
   height_ = 0;
 
   // Debug output
-  // std::cout << "Create frame " << align_width << "x" << align_height << std::endl;
+  // std::cout << "Create frame " << align_width << "x" << align_height <<
+  // std::endl;
 }
 
 Frame::~Frame() {
@@ -55,9 +56,7 @@ Frame::~Frame() {
 }
 
 
-Frame::Frame(Frame&& arg) {
-  Move(std::move(arg));
-}
+Frame::Frame(Frame&& arg) { Move(std::move(arg)); }
 
 
 Frame& Frame::operator=(Frame&& arg) {
@@ -80,17 +79,70 @@ void Frame::SetSize(int width, int height) {
 }
 
 
-void Frame::GetSizes(int* width, int* height, int* align_width, int* align_height) {
-  if (width) { *width = width_; }
-  if (height) { *height = height_; }
-  if (align_width) { *align_width = align_width_; }
-  if (align_height) { *align_height = align_height_; }
+void Frame::GetSizes(
+    int* width, int* height, int* align_width, int* align_height) {
+  if (width) {
+    *width = width_;
+  }
+  if (height) {
+    *height = height_;
+  }
+  if (align_width) {
+    *align_width = align_width_;
+  }
+  if (align_height) {
+    *align_height = align_height_;
+  }
 }
 
 
 void* Frame::GetData(size_t& data_size) {
   data_size = data_.size();
   return data_.data();
+}
+
+
+void Frame::DrawRectangle(int left, int top, int width, int height, uint8_t red,
+    uint8_t green, uint8_t blue, uint8_t alpha) {
+  if (left < 0) {
+    width += left;
+    left = 0;
+  }
+  if (top < 0) {
+    height += top;
+    top = 0;
+  }
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  int max_width = align_width_ - left;
+  int max_height = align_height_ - top;
+  if (max_width <= 0 || max_height <= 0) {
+    return;
+  }
+  if (width > max_width) {
+    width = max_width;
+  }
+  if (height > max_height) {
+    height = max_height;
+  }
+
+  // Отрисовка
+  uint8_t* line = &data_[(top * align_width_ + left) * kPixelSize];
+  for (int h = 0; h < height; ++h) {
+    auto p = line;
+    for (int w = 0; w < width; ++w) {
+      *p = blue;
+      ++p;
+      *p = green;
+      ++p;
+      *p = red;
+      ++p;
+      *p = alpha;
+      ++p;
+    }
+    line += align_width_ * kPixelSize;
+  }
 }
 
 

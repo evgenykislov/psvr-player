@@ -1,4 +1,7 @@
+
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
 #include <iostream>
 #include <thread>  // TODO Remove debug include
 
@@ -25,6 +28,7 @@ const char kHelpMessage[] =
     "exit\n"
     "  --help - show this help and exit\n"
     "  --play=<file-name> - play movie from specified file\n"
+    "  --show=squares|colorlines - show test figure, calibration image\n"
     "  --version - show version information and exit\n"
     "Options:\n"
     "  --layer=sbs|ou|mono - specify layer configuration\n"
@@ -41,10 +45,12 @@ enum CmdCommand {
   kCommandHelp,
   kCommandPlay,
   kCommandVersion,
-  kCommandCalibration
+  kCommandCalibration,
+  kCommandShow
 } cmd_command = kCommandUnspecified;
 
 std::string cmd_play_fname;
+std::string cmd_show_figure;
 
 enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
 
@@ -80,7 +86,18 @@ bool ParseCmd(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     std::string tail;
-    if (CheckArgument(arg, "--help", tail)) {
+
+    if (CheckArgument(arg, "--calibration", tail)) {
+      if (!tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      if (cmd_command != kCommandUnspecified) {
+        std::cerr << "Extra command '" << arg << "'" << std::endl;
+        return false;
+      }
+      cmd_command = kCommandCalibration;
+    } else if (CheckArgument(arg, "--help", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
         return false;
@@ -111,16 +128,6 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_command = kCommandListScreen;
-    } else if (CheckArgument(arg, "--calibration", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandCalibration;
     } else if (CheckArgument(arg, "--play=", tail)) {
       if (tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -139,6 +146,17 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_screen = tail;
+    } else if (CheckArgument(arg, "--show=", tail)) {
+      if (tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      if (cmd_command != kCommandUnspecified) {
+        std::cerr << "Extra command '" << arg << "'" << std::endl;
+        return false;
+      }
+      cmd_show_figure = tail;
+      cmd_command = kCommandShow;
     } else if (CheckArgument(arg, "--swapcolor", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -200,7 +218,7 @@ int DoPlayCommand() {
     return 1;
   }
 
-  auto trf = CreateTransformer(ps, vr);
+  auto trf = CreateTransformer(kLeftRight180, ps, vr);
   if (!trf) {
     return 1;
   }
@@ -242,6 +260,80 @@ int DoPlayCommand() {
 }
 
 
+/*! Выполнить команду show
+\return код возврата. 0 - если нет ошибок */
+int DoShowCommand() {
+  auto vr = CreateHelmetView();
+  if (!vr) {
+    std::cerr << "PS VR Helmet not found" << std::endl;
+  } else {
+    vr->SetVRMode(IHelmet::VRMode::kSplitScreen);
+  }
+
+  auto ps = CreatePlayScreen(cmd_screen);
+  if (!ps) {
+    return 1;
+  }
+
+  auto trf = CreateTransformer(kSingleImage, ps, vr);
+  if (!trf) {
+    return 1;
+  }
+
+  std::atomic_bool stop_show(false);
+  std::condition_variable stop_var;
+  std::thread show_thread([&stop_show, &stop_var, trf]() {
+    int r, g, b;
+    r = g = b = 128;
+    int fast_cycle_counter = 20;  //!< Счётчик частых показов (на старте)
+    try {
+      while (true) {
+        std::mutex m;
+        std::unique_lock<std::mutex> lk(m);
+        stop_var.wait_for(
+            lk, std::chrono::milliseconds(fast_cycle_counter > 0 ? 100 : 3000));
+        if (fast_cycle_counter > 0) {
+          --fast_cycle_counter;
+        }
+
+        if (stop_show) {
+          break;
+        }
+
+        auto f = RequestFrame(1000, 1000);
+        f.SetSize(1000, 1000);
+
+        for (int width = 250; width <= 1000; width += 250) {
+          f.DrawRectangle(
+              500 - width / 2, 500 - width / 2, width, 25, r, g, b, 255);
+          f.DrawRectangle(
+              500 - width / 2, 475 + width / 2, width, 25, r, g, b, 255);
+          f.DrawRectangle(
+              500 - width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+          f.DrawRectangle(
+              475 + width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+        }
+
+        trf->SetImage(std::move(f));
+      }
+    } catch (std::exception) {
+      std::cerr << "Can't create show frame" << std::endl;
+    }
+  });
+
+  assert(ps);
+  ps->Run();
+
+  stop_show = true;
+  stop_var.notify_all();
+  show_thread.join();
+
+  // TODO Сделать корректное освобождение ресурсов
+  // delete trf;
+  return 0;
+}
+
+
 int main(int argc, char** argv) {
   if (!ParseCmd(argc, argv)) {
     std::cerr << "-----" << std::endl;
@@ -267,13 +359,15 @@ int main(int argc, char** argv) {
   if (cmd_command == kCommandListScreen) {
     return PrintMonitors();
   }
-
   if (cmd_command == kCommandCalibration) {
     auto vr = CreateHelmetCalibration();
     std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
     return 0;
   }
-
+  if (cmd_command == kCommandShow) {
+    DoShowCommand();
+    return 0;
+  }
   if (cmd_command == kCommandPlay) {
     return DoPlayCommand();
   }
