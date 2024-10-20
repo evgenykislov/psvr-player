@@ -25,6 +25,7 @@ const char kHelpMessage[] =
     "exit\n"
     "  --help - show this help and exit\n"
     "  --play=<file-name> - play movie from specified file\n"
+    "  --show=squares|colorlines - show test figure, calibration image\n"
     "  --version - show version information and exit\n"
     "Options:\n"
     "  --layer=sbs|ou|mono - specify layer configuration\n"
@@ -41,10 +42,12 @@ enum CmdCommand {
   kCommandHelp,
   kCommandPlay,
   kCommandVersion,
-  kCommandCalibration
+  kCommandCalibration,
+  kCommandShow
 } cmd_command = kCommandUnspecified;
 
 std::string cmd_play_fname;
+std::string cmd_show_figure;
 
 enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
 
@@ -80,7 +83,18 @@ bool ParseCmd(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     std::string tail;
-    if (CheckArgument(arg, "--help", tail)) {
+
+    if (CheckArgument(arg, "--calibration", tail)) {
+      if (!tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      if (cmd_command != kCommandUnspecified) {
+        std::cerr << "Extra command '" << arg << "'" << std::endl;
+        return false;
+      }
+      cmd_command = kCommandCalibration;
+    } else if (CheckArgument(arg, "--help", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
         return false;
@@ -111,16 +125,6 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_command = kCommandListScreen;
-    } else if (CheckArgument(arg, "--calibration", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandCalibration;
     } else if (CheckArgument(arg, "--play=", tail)) {
       if (tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -139,6 +143,17 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_screen = tail;
+    } else if (CheckArgument(arg, "--show=", tail)) {
+      if (tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      if (cmd_command != kCommandUnspecified) {
+        std::cerr << "Extra command '" << arg << "'" << std::endl;
+        return false;
+      }
+      cmd_show_figure = tail;
+      cmd_command = kCommandShow;
     } else if (CheckArgument(arg, "--swapcolor", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -267,13 +282,15 @@ int main(int argc, char** argv) {
   if (cmd_command == kCommandListScreen) {
     return PrintMonitors();
   }
-
   if (cmd_command == kCommandCalibration) {
     auto vr = CreateHelmetCalibration();
     std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
     return 0;
   }
-
+  if (cmd_command == kCommandShow) {
+    std::cerr << "TODO Not implemented yet" << std::endl;
+    return 0;
+  }
   if (cmd_command == kCommandPlay) {
     return DoPlayCommand();
   }
