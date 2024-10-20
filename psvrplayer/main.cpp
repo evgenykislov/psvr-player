@@ -180,6 +180,68 @@ bool ParseCmd(int argc, char** argv) {
   return true;
 }
 
+
+/*! Выполнить команду play
+\return код возврата. 0 - если нет ошибок */
+int DoPlayCommand() {
+  auto vr = CreateHelmetView();
+  if (!vr) {
+    std::cerr << "PS VR Helmet not found" << std::endl;
+  }
+
+  if (vr) {
+    bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
+    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
+                          : IHelmet::VRMode::kSingleScreen);
+  }
+
+  auto ps = CreatePlayScreen(cmd_screen);
+  if (!ps) {
+    return 1;
+  }
+
+  auto trf = CreateTransformer(ps, vr);
+  if (!trf) {
+    return 1;
+  }
+
+  trf->SetEyeSwap(cmd_swap_layer);
+
+  auto vp = CreateVideoPlayer();
+  if (!vp) {
+    return 1;
+  }
+
+  if (!vp->OpenMovie(cmd_play_fname)) {
+    std::cerr << "Can't open movie" << std::endl;
+  }
+
+  while (vp->GetMovieState() == IVideoPlayer::MovieState::kMovieParsing) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  // TODO Remove debug
+  vp->SetDisplayFn([&trf](Frame&& frame) { trf->SetImage(std::move(frame)); });
+
+  vp->Play();
+
+  if (ps) {
+    ps->SetKeyboardFilter(
+        [vp, vr](int key, int scancode, int action, int mods) {
+          KeyProcessor(key, scancode, action, mods, vp, vr);
+        });
+    ps->SetMouseEvent([trf](double x_pos, double y_pos) {
+      MouseProcessor(x_pos, y_pos, trf);
+    });
+    ps->Run();
+  }
+
+  // TODO Сделать корректное освобождение ресурсов
+  // delete trf;
+  return 0;
+}
+
+
 int main(int argc, char** argv) {
   if (!ParseCmd(argc, argv)) {
     std::cerr << "-----" << std::endl;
@@ -213,61 +275,7 @@ int main(int argc, char** argv) {
   }
 
   if (cmd_command == kCommandPlay) {
-    auto vr = CreateHelmetView();
-    if (!vr) {
-      std::cerr << "PS VR Helmet not found" << std::endl;
-    }
-
-    if (vr) {
-      bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
-      vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
-                            : IHelmet::VRMode::kSingleScreen);
-    }
-
-    auto ps = CreatePlayScreen(cmd_screen);
-    if (!ps) {
-      return 1;
-    }
-
-    auto trf = CreateTransformer(ps, vr);
-    if (!trf) {
-      return 1;
-    }
-
-    trf->SetEyeSwap(cmd_swap_layer);
-
-    auto vp = CreateVideoPlayer();
-    if (!vp) {
-      return 1;
-    }
-
-    if (!vp->OpenMovie(cmd_play_fname)) {
-      std::cerr << "Can't open movie" << std::endl;
-    }
-
-    while (vp->GetMovieState() == IVideoPlayer::MovieState::kMovieParsing) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    // TODO Remove debug
-    vp->SetDisplayFn(
-        [&trf](Frame&& frame) { trf->SetImage(std::move(frame)); });
-
-    vp->Play();
-
-    if (ps) {
-      ps->SetKeyboardFilter(
-          [vp, vr](int key, int scancode, int action, int mods) {
-            KeyProcessor(key, scancode, action, mods, vp, vr);
-          });
-      ps->SetMouseEvent([trf](double x_pos, double y_pos) {
-        MouseProcessor(x_pos, y_pos, trf);
-      });
-      ps->Run();
-    }
-
-    // TODO Сделать корректное освобождение ресурсов
-    // delete trf;
+    return DoPlayCommand();
   }
 
   return 0;
