@@ -27,6 +27,10 @@ class Transformer {
 
   // TODO ???
   virtual void SetViewPoint(float x_disp, float y_disp) = 0;
+
+  /*! Выставить межглазное расстояние в условных миллиметрах
+  \param delta межглазное расстояние в условных миллиметрах */
+  virtual void SetEyesDistance(int distance) = 0;
 };
 
 // TODO Сделать shared_ptr
