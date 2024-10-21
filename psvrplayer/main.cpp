@@ -17,6 +17,8 @@
 const int kCalibrationTimeout =
     20;  //!< Интервал калибровки сенсоров шлема, в секундах
 
+const int kDefaultEyesDistance = 66;  //!< Расстояние между окулярами в шлеме
+
 // TODO Add calibration command
 
 const char kHelpMessage[] =
@@ -31,6 +33,7 @@ const char kHelpMessage[] =
     "  --show=squares|colorlines - show test figure, calibration image\n"
     "  --version - show version information and exit\n"
     "Options:\n"
+    "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
     "  --layer=sbs|ou|mono - specify layer configuration\n"
     "  --screen=<position> - specify screen (by position) to play movie\n"
     "  --swapcolor - correct color\n"
@@ -57,6 +60,7 @@ enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
 std::string cmd_screen;
 bool cmd_swap_color = false;
 bool cmd_swap_layer = false;
+int cmd_eyes_distance = kDefaultEyesDistance;
 
 enum CmdVision {
   kVisionFull,
@@ -97,6 +101,22 @@ bool ParseCmd(int argc, char** argv) {
         return false;
       }
       cmd_command = kCommandCalibration;
+    } else if (CheckArgument(arg, "--eyes=", tail)) {
+      if (tail.empty()) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
+      try {
+        cmd_eyes_distance = std::stoi(tail);
+        if (cmd_eyes_distance < 40 || cmd_eyes_distance > 100) {
+          std::cerr << "Eyes distance should be in range 40 .. 100"
+                    << std::endl;
+          return false;
+        }
+      } catch (std::exception) {
+        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+        return false;
+      }
     } else if (CheckArgument(arg, "--help", tail)) {
       if (!tail.empty()) {
         std::cerr << "Unknown argument '" << arg << "'" << std::endl;
@@ -224,7 +244,7 @@ int DoPlayCommand() {
   }
 
   trf->SetEyeSwap(cmd_swap_layer);
-  trf->SetEyesDistance(66);
+  trf->SetEyesDistance(cmd_eyes_distance);
 
   auto vp = CreateVideoPlayer();
   if (!vp) {
@@ -280,6 +300,9 @@ int DoShowCommand() {
   if (!trf) {
     return 1;
   }
+
+  trf->SetEyesDistance(cmd_eyes_distance);
+
 
   std::atomic_bool stop_show(false);
   std::condition_variable stop_var;
