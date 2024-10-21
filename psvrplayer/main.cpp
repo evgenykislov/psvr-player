@@ -224,6 +224,7 @@ int DoPlayCommand() {
   }
 
   trf->SetEyeSwap(cmd_swap_layer);
+  trf->SetEyesDistance(66);
 
   auto vp = CreateVideoPlayer();
   if (!vp) {

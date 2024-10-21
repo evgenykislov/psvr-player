@@ -54,7 +54,7 @@ class GlProgramm: public Transformer {
   void SetImage(Frame&& frame) override;
   void SetEyeSwap(bool swap) override;
   void SetViewPoint(float x_disp, float y_disp) override;
-
+  void SetEyesDistance(int distance) override;
 
  private:
   GlProgramm() = delete;
@@ -72,6 +72,7 @@ class GlProgramm: public Transformer {
     // Настройки
     bool swap_eyes;  // Настройка: поменять изображения для левого-правого глаз
     TransformerScheme scheme;
+    float eyes_correction;
 
     // Вход-Выход
     GLuint input_texture;  // Номер текстуры входного изображения
@@ -95,6 +96,8 @@ class GlProgramm: public Transformer {
   std::mutex last_frames_lock_;
   bool swap_eyes_setting_;  //!< Настройка по смене порядка изображений для
                             //!< глаз. Настройка под блокировкой update_lock_
+  float eyes_correction_;  //!< Корректировка глазного расстояния. Под
+                           //!< блокировкой update_lock_
   float x_angle_;
   float y_angle_;
 
@@ -147,7 +150,10 @@ Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
 
 GlProgramm::GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
     std::shared_ptr<IHelmet> helmet)
-    : swap_eyes_setting_(false), split_program_(0), half_cilinder_program_(0) {
+    : swap_eyes_setting_(false),
+      split_program_(0),
+      eyes_correction_(0.0f),
+      half_cilinder_program_(0) {
   scheme_settings_ = scheme;
   screen_ = screen;
   helmet_ = helmet;
@@ -207,6 +213,11 @@ void GlProgramm::SetViewPoint(float x_disp, float y_disp) {
   if (x_angle_ > maxx) {
     maxx = x_angle_;
   }
+}
+
+void GlProgramm::SetEyesDistance(int distance) {
+  std::unique_lock<std::mutex> lk(update_lock_);
+  eyes_correction_ = (66 - distance) / 72.0f;
 }
 
 void GlProgramm::Processing() {
@@ -279,6 +290,7 @@ void GlProgramm::Processing() {
     }
     params.swap_eyes = swap_eyes_setting_;
     params.scheme = scheme_settings_;
+    params.eyes_correction = eyes_correction_;
     lk.unlock();
 
     helmet_->GetViewPoint(
@@ -335,6 +347,9 @@ void GlProgramm::Processing() {
     loc = glGetUniformLocation(output_program, "right_image");
     glUniform1i(loc, 1);
     glActiveTexture(GL_TEXTURE0);
+    // eyes correction
+    loc = glGetUniformLocation(output_program, "eyes_correction");
+    glUniform1f(loc, params.eyes_correction);
 
     //    glBindTexture(GL_TEXTURE_2D, left_eye.texture);
     glBindVertexArray(flat_vertex_.array_id);
