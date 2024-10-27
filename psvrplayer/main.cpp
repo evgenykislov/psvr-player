@@ -281,6 +281,43 @@ int DoPlayCommand() {
 }
 
 
+Frame GenerateSquares() {
+  int r, g, b;
+  r = g = b = 128;
+  auto f = RequestFrame(1000, 1000);
+  f.SetSize(1000, 1000);
+
+  for (int width = 250; width <= 1000; width += 250) {
+    f.DrawRectangle(500 - width / 2, 500 - width / 2, width, 25, r, g, b, 255);
+    f.DrawRectangle(500 - width / 2, 475 + width / 2, width, 25, r, g, b, 255);
+    f.DrawRectangle(
+        500 - width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+    f.DrawRectangle(
+        475 + width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+  }
+
+  return f;
+}
+
+
+Frame GenerateColors() {
+  auto f = RequestFrame(1000, 1000);
+  f.SetSize(1000, 1000);
+
+  for (int i = 0; i < 1000; i += 110) {
+    for (int j = 0; j < 1000; j += 110) {
+      f.DrawRectangle(i, j, 10, 10, 128, 0, 0, 255);
+      f.DrawRectangle(i + 10, j, 50, 10, 0, 128, 0, 255);
+      f.DrawRectangle(i + 60, j, 50, 10, 0, 0, 128, 255);
+      f.DrawRectangle(i, j + 10, 10, 50, 0, 128, 0, 255);
+      f.DrawRectangle(i, j + 60, 10, 50, 0, 0, 128, 255);
+    }
+  }
+
+  return f;
+}
+
+
 /*! Выполнить команду show
 \return код возврата. 0 - если нет ошибок */
 int DoShowCommand() {
@@ -307,8 +344,6 @@ int DoShowCommand() {
   std::atomic_bool stop_show(false);
   std::condition_variable stop_var;
   std::thread show_thread([&stop_show, &stop_var, trf]() {
-    int r, g, b;
-    r = g = b = 128;
     int fast_cycle_counter = 20;  //!< Счётчик частых показов (на старте)
     try {
       while (true) {
@@ -324,20 +359,12 @@ int DoShowCommand() {
           break;
         }
 
-        auto f = RequestFrame(1000, 1000);
-        f.SetSize(1000, 1000);
-
-        for (int width = 250; width <= 1000; width += 250) {
-          f.DrawRectangle(
-              500 - width / 2, 500 - width / 2, width, 25, r, g, b, 255);
-          f.DrawRectangle(
-              500 - width / 2, 475 + width / 2, width, 25, r, g, b, 255);
-          f.DrawRectangle(
-              500 - width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
-          f.DrawRectangle(
-              475 + width / 2, 525 - width / 2, 25, width - 50, r, g, b, 255);
+        Frame f(1000, 1000);
+        if (cmd_show_figure == "squares") {
+          f = GenerateSquares();
+        } else if (cmd_show_figure == "colors") {
+          f = GenerateColors();
         }
-
         trf->SetImage(std::move(f));
       }
     } catch (std::exception) {
