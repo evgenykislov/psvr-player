@@ -9,50 +9,61 @@ uniform sampler2D right_image;
 // изображений
 uniform float eyes_correction;
 
-
-#define DEBUG_DISTORSION
-
+// Включить отладочный код для подбора параметров дистории
+// #define DEBUG_DISTORSION
 
 const float kScreenWidth2Height = 960.0f / 1080.0f;
 
+// Максимальная обрабатываемая дистанция для компенсации дисторсии
+float kDistorsionMaxDist = 1.300f;
+
+// Функция FixDistorsion принимает на вход координаты пикселя, который нужно
+// отобразить, в прямоугольном полу и возвращает координаты пикселя, откуда
+// нужно брать цвет
+// Координаты задаются в диапазоне x=-1..+1; y=-1..+1
 
 #ifdef DEBUG_DISTORSION
 
-float kDistorsion0 = 1.00; // Len = 0. It's center of screen. k = 1.0
-float kDistorsion1 = 1.00; // Len = 0.250. It's first square center of edge. k near 1.0
-float kDistorsion2 = 1.02; // Len = 0.354. It's first square corner
-float kDistorsion3 = 1.06; // Len = 0.500. Second square edge center
-float kDistorsion4 = 1.08; // Len = 0.600. Second square corner and third square edge center
-float kDistorsion5 = 1.14; // Len = 0.750. Third square corner and forth square edge center
-float kDistorsion6 = 1.23; // Len = 0.900. 1/4 and 3/4 of forth square edge
-float kDistorsion7 = 1.36; // Len = 1.050. Forth square corner
-float kDistorsion8 = 1.55; // Len = 1.200. ???
-float kDistorsionMaxDist = 1.50;
+#define kPointAmount 8
+
+// Два массива содержат точки аппроксимации: длина и корректирующий масштабный
+// коэффициент. Длины должны идти в возрастающем порядке. Рекомендауется
+// начинать с длины 0.0f
+
+float DistorsionLength[kPointAmount] = float[kPointAmount](
+    0.000f, 0.240f, 0.420f, 0.660f, 0.880f, 0.960f, 1.040f, 1.300f);
+float DistorsionScale[kPointAmount] = float[kPointAmount](
+    0.810f, 0.820f, 0.840f, 0.900f, 1.000f, 1.060f, 1.140f, 1.480f);
+
+// Характерные длины
+// 0.24f  - ближняя кромка середины стороны 1-го квадрата
+// 0.53f  - ближняя кромка середины стороны 2-го квадрата
+// 0.76f  - ближняя кромка середины стороны 3-го квадрата
+// 0.94f  - ближняя кромка середины стороны 4-го квадрата
+// 1.04f  - угол 4-го квадрата
+
 
 vec2 FixDistorsion(vec2 pos) {
   // Отладочная версия
   vec2 cpos;
+  float k = 0.0f;
   cpos.x = pos.x;
   cpos.y = pos.y;
   float len = length(cpos);
+
   if (len > kDistorsionMaxDist) { return vec2(100.0f, 100.0f); } // Very far point
-  float k = 1.0;
-  if (len <= 0.250) {
-    k = kDistorsion0 + (kDistorsion1 - kDistorsion0) / 0.250 * len;
-  } else if (len <= 0.354) {
-    k = kDistorsion1 + (kDistorsion2 - kDistorsion1) / 0.104 * (len - 0.250);
-  } else if (len <= 0.500) {
-    k = kDistorsion2 + (kDistorsion3 - kDistorsion2) / 0.146 * (len - 0.354);
-  } else if (len <= 0.600) {
-    k = kDistorsion3 + (kDistorsion4 - kDistorsion3) / 0.100 * (len - 0.500);
-  } else if (len <= 0.750) {
-    k = kDistorsion4 + (kDistorsion5 - kDistorsion4) / 0.150 * (len - 0.600);
-  } else if (len <= 0.900) {
-    k = kDistorsion5 + (kDistorsion6 - kDistorsion5) / 0.150 * (len - 0.750);
-  } else if (len <= 1.050) {
-    k = kDistorsion6 + (kDistorsion7 - kDistorsion6) / 0.150 * (len - 0.900);
-  } else {
-    k = kDistorsion7 + (kDistorsion8 - kDistorsion7) / 0.150 * (len - 1.050);
+
+  for (int i = 1; i < kPointAmount; ++i) {
+    if (len > DistorsionLength[i]) { continue; }
+    // Нашли нужный интервал (i - 1; i]
+    float d = DistorsionLength[i] - DistorsionLength[i - 1];
+    if (d <= 0.0001f) {
+      k = DistorsionScale[i - 1];
+    } else {
+      k = (DistorsionScale[i] - DistorsionScale[i - 1]) / d *
+          (len - DistorsionLength[i - 1]) + DistorsionScale[i - 1];
+    }
+    break;
   }
 
   pos.x *= k;
@@ -63,15 +74,16 @@ vec2 FixDistorsion(vec2 pos) {
 #else
 
 vec2 FixDistorsion(vec2 pos) {
+  const float kBase = 0.81f;
+  const float kJam = 0.35f;
+  const float kScale = 0.016786f;
   vec2 cpos;
   cpos.x = pos.x;
   cpos.y = pos.y;
   float len = length(cpos);
 
-  if (len > 1.5) { return pos; }
-  float km1 = -0.02328336 * len * len * len + 0.33334678 * len * len -
-      0.10098184 * len + 1.00274654;
-  float k = 1.0 / km1;
+  if (len > kDistorsionMaxDist) { return vec2(100.0f, 100.0f); } // Very far point
+  float k = kScale * (exp(len / kJam) - kBase) + kBase;
 
   pos.x *= k;
   pos.y *= k;
