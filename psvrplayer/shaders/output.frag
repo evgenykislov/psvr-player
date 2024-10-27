@@ -93,6 +93,29 @@ vec2 FixDistorsion(vec2 pos) {
 #endif
 
 
+vec2 GetGreenPos(vec2 red_pos) {
+  vec2 res;
+  const float kHorizontalBase = 0.4f;
+  const float kHorizontalScale = 1.008f;
+  const float kVerticalBase = 0.59f;
+  const float kVerticalScale = 1.008f;
+  res.x = (red_pos.x - kHorizontalBase) * kHorizontalScale + kHorizontalBase;
+  res.y = (red_pos.y - kVerticalBase) * kVerticalScale + kVerticalBase;
+  return res;
+}
+
+
+vec2 GetBluePos(vec2 red_pos) {
+  vec2 res;
+  const float kHorizontalBase = 0.4f;
+  const float kHorizontalScale = 1.017f;
+  const float kVerticalBase = 0.59f;
+  const float kVerticalScale = 1.017f;
+  res.x = (red_pos.x - kHorizontalBase) * kHorizontalScale + kHorizontalBase;
+  res.y = (red_pos.y - kVerticalBase) * kVerticalScale + kVerticalBase;
+  return res;
+}
+
 
 vec4 GetTextureColor(vec2 frame_pos, int eye_index) {
   vec2 pos = frame_pos;
@@ -120,12 +143,15 @@ vec4 GetTextureColor(vec2 frame_pos, int eye_index) {
 }
 
 
-
 void main()
 {
   float xpos;
   float ypos;
   int eye_index;
+  vec2 red_pos;
+  vec2 green_pos;
+  vec2 blue_pos;
+
 
   float bd = 0.5f - kScreenWidth2Height / 2.0f; // Нижняя граница изображения
   float bu = 0.5f + kScreenWidth2Height / 2.0f; // Верхняя граница изображения
@@ -143,5 +169,12 @@ void main()
   }
   ypos = (screen_pos.y - bd) / kScreenWidth2Height;
 
-  color = GetTextureColor(vec2(xpos, ypos), eye_index);
+  red_pos = vec2(xpos, ypos);
+  green_pos = GetGreenPos(red_pos);
+  blue_pos = GetBluePos(red_pos);
+
+  color.r = GetTextureColor(red_pos, eye_index).r;
+  color.g = GetTextureColor(green_pos, eye_index).g;
+  color.b = GetTextureColor(blue_pos, eye_index).b;
+  color.a = 1.0f;
 }
