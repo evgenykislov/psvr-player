@@ -1,0 +1,12 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Categories=AudioVideo
+Terminal=true
+Exec=psvrplayer
+Name=psvrplayer
+Comment=3D movie player for PSVR
+Icon=psvrplayer
+
