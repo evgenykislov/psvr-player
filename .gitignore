@@ -36,3 +36,4 @@
 *.md.backup
 
 /psvrplayer/shaders/*.h
+cmake_install.cmake
