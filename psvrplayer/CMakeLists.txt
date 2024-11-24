@@ -84,3 +84,5 @@ target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
 target_link_libraries(${PROJECT_NAME} ${HIDAPI_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
 target_link_libraries(${PROJECT_NAME} iniparser-static)
+
+install(TARGETS ${PROJECT_NAME})
