@@ -293,8 +293,12 @@ void GlProgramm::Processing() {
     params.eyes_correction = eyes_correction_;
     lk.unlock();
 
-    helmet_->GetViewPoint(
-        params.right_angle, params.top_angle, params.roll_angle);
+    if (helmet_) {
+      helmet_->GetViewPoint(
+          params.right_angle, params.top_angle, params.roll_angle);
+    } else {
+      params.right_angle = params.top_angle = params.roll_angle = 0.0;
+    }
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
     std::vector<Frame> last;
