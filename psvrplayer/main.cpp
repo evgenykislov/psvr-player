@@ -26,6 +26,7 @@ const char kHelpMessage[] =
     "Usage:\n"
     "  psvrplayer [options] command\n"
     "Commands:\n"
+    "  --calibration - calibrate vr helmet device\n"
     "  --listscreens - show list of available screens with their position and "
     "exit\n"
     "  --help - show this help and exit\n"
@@ -34,11 +35,11 @@ const char kHelpMessage[] =
     "  --version - show version information and exit\n"
     "Options:\n"
     "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
-    "  --layer=sbs|ou|mono - specify layer configuration\n"
+/*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
     "  --screen=<position> - specify screen (by position) to play movie\n"
     "  --swapcolor - correct color\n"
     "  --swaplayer - correct order of layers\n"
-    "  --vision=full|semi|flat - specify area of vision\n"
+/*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
     "";
 
