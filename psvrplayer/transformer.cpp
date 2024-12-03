@@ -270,7 +270,11 @@ void GlProgramm::Processing() {
   }
 
   // Проекционная матрица на квадратное поле зрения
-  projection_matrix_ = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 3.0f);
+  const float kDistorsionCompensation =
+      2.0f;  // Компенсация сужения изображения к центру (в 2 раза) при
+             // компенсации дисторсии
+  projection_matrix_ = glm::perspective(
+      glm::radians(60.0f * kDistorsionCompensation), 1.0f, 0.1f, 3.0f);
 
   // Входная текстура из проигрывателя
   glGenTextures(1, &params.input_texture);

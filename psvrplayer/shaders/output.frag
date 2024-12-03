@@ -15,10 +15,14 @@ uniform float eyes_correction;
 const float kScreenWidth2Height = 960.0f / 1080.0f;
 
 // Максимальная обрабатываемая дистанция для компенсации дисторсии
+// (только для отладочной аппроксимации)
 float kDistorsionMaxDist = 1.300f;
 
+// Масштаб, применяемый, чтобы увидеть уголки изображения
+float kDistorsionScale = 0.5f;
+
 // Функция FixDistorsion принимает на вход координаты пикселя, который нужно
-// отобразить, в прямоугольном полу и возвращает координаты пикселя, откуда
+// отобразить (в прямоугольном поле), и возвращает координаты пикселя, откуда
 // нужно брать цвет
 // Координаты задаются в диапазоне x=-1..+1; y=-1..+1
 
@@ -51,8 +55,6 @@ vec2 FixDistorsion(vec2 pos) {
   cpos.y = pos.y;
   float len = length(cpos);
 
-  if (len > kDistorsionMaxDist) { return vec2(100.0f, 100.0f); } // Very far point
-
   for (int i = 1; i < kPointAmount; ++i) {
     if (len > DistorsionLength[i]) { continue; }
     // Нашли нужный интервал (i - 1; i]
@@ -82,7 +84,6 @@ vec2 FixDistorsion(vec2 pos) {
   cpos.y = pos.y;
   float len = length(cpos);
 
-  if (len > kDistorsionMaxDist) { return vec2(100.0f, 100.0f); } // Very far point
   float k = kScale * (exp(len / kJam) - kBase) + kBase;
 
   pos.x *= k;
@@ -117,13 +118,26 @@ vec2 GetBluePos(vec2 red_pos) {
 }
 
 
+/*! Функция принимает на вход координаты пикселя (в прямоугольном поле) и номер
+потока (глаза). На вывод выдаёт цвет в этой позиции
+\param frame_pos координаты пикселя (x чуть шире 0..1, y чуть шире 0..1)
+\param eye_index индекс глаза (0 - левый, 1 - правый)
+*/
 vec4 GetTextureColor(vec2 frame_pos, int eye_index) {
   vec2 pos = frame_pos;
   vec2 center_pos = vec2(frame_pos.x * 2.0f - 1.0, frame_pos.y * 2.0f - 1.0);
   vec2 fix_pos = FixDistorsion(center_pos);
-  if (fix_pos.x < -1.0 || fix_pos.x > 1.0 || fix_pos.y < -1.0 || fix_pos.y > 1.0) {
-    return vec4(0.0, 0.0, 0.0, 0.0);
+  fix_pos *= kDistorsionScale;
+
+  // Show border
+/*
+  if ((fix_pos.x > -1.0 && fix_pos.x < -0.99) || (fix_pos.x > 0.99 && fix_pos.x < 1.0)) {
+    return vec4(0.0, 0.0, 1.0, 0.0);
   }
+  if ((fix_pos.y > -1.0 && fix_pos.y < -0.99) || (fix_pos.y > 0.99 && fix_pos.y < 1.0)) {
+    return vec4(0.0, 0.0, 1.0, 0.0);
+  }
+*/
 
   vec2 tx_pos = vec2(fix_pos.x / 2.0 + 0.5, fix_pos.y / 2.0f + 0.5);
   vec2 move_pos = tx_pos;
@@ -132,7 +146,7 @@ vec4 GetTextureColor(vec2 frame_pos, int eye_index) {
   } else {
     move_pos.x += eyes_correction;
   }
-  if (move_pos.x < 0.0 || move_pos.x > 1.0) {
+  if (move_pos.x < 0.0 || move_pos.x > 1.0 || move_pos.y < 0.0 || move_pos.y > 1.0) {
     return vec4(0.0, 0.0, 0.0, 0.0);
   }
 
@@ -155,10 +169,6 @@ void main()
 
   float bd = 0.5f - kScreenWidth2Height / 2.0f; // Нижняя граница изображения
   float bu = 0.5f + kScreenWidth2Height / 2.0f; // Верхняя граница изображения
-  if (screen_pos.y < bd || screen_pos.y > bu) {
-    color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-    return;
-  }
 
   if (screen_pos.x < 0.5f) {
     xpos = screen_pos.x * 2.0f;
