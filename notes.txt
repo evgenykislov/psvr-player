@@ -1,0 +1,4 @@
+PSVR Player changes
+
+04.12.2024: Fixes rendering of viewfield bounds.
+30.11.2024: Initial release of 3D video player.
