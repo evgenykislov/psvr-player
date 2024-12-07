@@ -1,8 +1,10 @@
 
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <iostream>
+#include <map>
 #include <thread>  // TODO Remove debug include
 
 #include "framepool.h"
@@ -35,29 +37,69 @@ const char kHelpMessage[] =
     "  --version - show version information and exit\n"
     "Options:\n"
     "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
-/*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
+    /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
     "  --screen=<position> - specify screen (by position) to play movie\n"
     "  --swapcolor - correct color\n"
     "  --swaplayer - correct order of layers\n"
-/*    "  --vision=full|semi|flat - specify area of vision\n" */
+    /*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
     "";
 
-enum CmdCommand {
-  kCommandUnspecified,
-  kCommandListScreen,
-  kCommandHelp,
-  kCommandPlay,
-  kCommandVersion,
-  kCommandCalibration,
-  kCommandShow
-} cmd_command = kCommandUnspecified;
+enum ParamType { kEmptyValue, kStringValue, kNumberValue };
 
-std::string cmd_play_fname;
-std::string cmd_show_figure;
+enum ParamCmd {
+  kCmdCalibration,
+  kCmdEyes,
+  kCmdHelp,
+  kCmdLayer,
+  kCmdListScreens,
+  kCmdPlay,
+  kCmdScreen,
+  kCmdShow,
+  kCmdSwapColor,
+  kCmdSwapLayer,
+  kCmdVersion,
+  kCmdVision
+};
+
+const std::string kCmdPrefix = "--";
+const ParamCmd kEmptyPrefixCmd = kCmdPlay;
+
+struct CommandLineParam {
+  ParamCmd cmd;  // Выполняемая команда или изменяемый параметр
+  bool is_command;  // Признак, что параметр является командой (один тип на
+                    // командную строку)
+  bool is_multiset;  // Признак, что параметр можно указывать несколько раз
+  ParamType value_type;     // Тип параметра
+  std::string prefix;       // Заголовок параметра
+  std::string description;  // Описание параметра
+};
+
+struct CommandLineValue {
+  std::string strvalue;  // Строковое значение параметра
+  int numvalue;  // Числовое значение параметра (если выставлен numtype)
+};
+
+// clang-format off
+std::array<CommandLineParam, 12> CmdParameters = {{
+  {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
+  {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
+  {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
+  {kCmdLayer, false, false, kStringValue, "--layer=", "layer switcher"},
+  {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
+  {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
+  {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
+  {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
+  {kCmdSwapColor, false, false, kEmptyValue, "--swapcolor", "change color palette"},
+  {kCmdSwapLayer, false, false, kEmptyValue, "--swaplayer", "swap left/right view"},
+  {kCmdVersion, false, false, kEmptyValue, "--version", "show version information"},
+  {kCmdVision, false, false, kStringValue, "--vision=", "selects format of 3D movie"},
+}};
+// clang-format on
+
+std::map<ParamCmd, std::vector<CommandLineValue>> CmdValues;
 
 enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
-
 std::string cmd_screen;
 bool cmd_swap_color = false;
 bool cmd_swap_layer = false;
@@ -69,160 +111,178 @@ enum CmdVision {
   kVisionFlat
 } cmd_vision = kVisionSemi;
 
-void PrintHelp() { std::cout << kHelpMessage << std::endl; }
 
-/*! Проверяет аргумент (arg) на соответствие заголовку (header). Если есть
-совпадение, то в параметре tail возвращается  остаток строки.
-\return признак совпадения аргумента и заголовка */
-bool CheckArgument(
-    const std::string& arg, const char* header, std::string& tail) {
-  std::string h(header);
-  if (arg.substr(0, h.size()) != h) {
-    return false;
+/*! Найти первую непустую команду в CmdValues
+\return количество непустых команд в CmdValues
+*/
+int FindFirstCmd(ParamCmd& cmd) {
+  int amount = 0;
+  for (auto it = CmdValues.begin(); it != CmdValues.end(); ++it) {
+    if (it->second.empty()) {
+      continue;
+    }
+    // Немного непроизводительно, но параметров мало
+    bool iscmd = false;
+    for (auto cit = CmdParameters.begin(); cit != CmdParameters.end(); ++cit) {
+      if (cit->cmd == it->first && cit->is_command) {
+        iscmd = true;
+        break;
+      }
+    }
+    if (!iscmd) {
+      continue;
+    }
+
+    // Это команда и она не пустая
+    if (amount == 0) {
+      cmd = it->first;
+    }
+    ++amount;
   }
-  assert(arg.size() >= h.size());
-  tail = arg.substr(h.size());
-  return true;
+  return amount;
 }
 
 /*! Разбор командной строки.
 \return признак успешного разбора (без ошибок) */
-bool ParseCmd(int argc, char** argv) {
+bool ParseCommandLine(int argc, char** argv) {
+  CmdValues.clear();
   for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    std::string tail;
+    auto param_it = CmdParameters.end();
+    std::string param_tail = argv[i];
+    if (param_tail.substr(0, kCmdPrefix.size()) != kCmdPrefix) {
+      for (auto cit = CmdParameters.begin(); cit != CmdParameters.end();
+           ++cit) {
+        if (cit->cmd == kEmptyPrefixCmd) {
+          param_it = cit;
+        }
+      }
+    } else {
+      for (auto cit = CmdParameters.begin(); cit != CmdParameters.end();
+           ++cit) {
+        if (param_tail.substr(0, cit->prefix.size()) == cit->prefix) {
+          param_it = cit;
+          param_tail = param_tail.substr(cit->prefix.size());
+        }
+      }
+    }
 
-    if (CheckArgument(arg, "--calibration", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandCalibration;
-    } else if (CheckArgument(arg, "--eyes=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      try {
-        cmd_eyes_distance = std::stoi(tail);
-        if (cmd_eyes_distance < 40 || cmd_eyes_distance > 100) {
-          std::cerr << "Eyes distance should be in range 40 .. 100"
+    if (param_it == CmdParameters.end()) {
+      std::cerr << "Unknown parameter '" << param_tail << "'" << std::endl;
+      return false;
+    }
+
+    CommandLineValue val;
+    val.strvalue = param_tail;
+    val.numvalue = 0;
+    switch (param_it->value_type) {
+      case kEmptyValue:
+        if (!param_tail.empty()) {
+          std::cerr << "Wrong format of parameter '" << param_it->prefix << "'"
                     << std::endl;
           return false;
         }
-      } catch (std::exception) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-    } else if (CheckArgument(arg, "--help", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandHelp;
-    } else if (CheckArgument(arg, "--layer=", tail)) {
-      if (tail == "sbs") {
-        cmd_layer = kLayerSbs;
-      } else if (tail == "ou") {
-        cmd_layer = kLayerOu;
-      } else if (tail == "mono") {
-        cmd_layer = kLayerMono;
-      } else {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-    } else if (CheckArgument(arg, "--listscreens", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandListScreen;
-    } else if (CheckArgument(arg, "--play=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_play_fname = tail;
-      cmd_command = kCommandPlay;
+        break;
+      case kStringValue:
+        if (param_tail.empty()) {
+          std::cerr << "Empty value for parameter '" << param_it->prefix << "'"
+                    << std::endl;
+          return false;
+        }
+        break;
+      case kNumberValue:
+        try {
+          val.numvalue = std::stoi(param_tail);
+        } catch (...) {
+          std::cerr << "Wrong numerical value for parameter '"
+                    << param_it->prefix << "'" << std::endl;
+          return false;
+        }
+        break;
+      default:
+        assert(false);
+    }
 
-    } else if (CheckArgument(arg, "--screen=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_screen = tail;
-    } else if (CheckArgument(arg, "--show=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_show_figure = tail;
-      cmd_command = kCommandShow;
-    } else if (CheckArgument(arg, "--swapcolor", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_swap_color = true;
-    } else if (CheckArgument(arg, "--swaplayer", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_swap_layer = true;
-    } else if (CheckArgument(arg, "--version", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandVersion;
-    } else if (CheckArgument(arg, "--vision=", tail)) {
-      if (tail == "full") {
-        cmd_vision = kVisionFull;
-      } else if (tail == "semi") {
-        cmd_vision = kVisionSemi;
-      } else if (tail == "flat") {
-        cmd_vision = kVisionFlat;
-      } else {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-    } else {
-      std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+    CmdValues[param_it->cmd].push_back(val);
+    if (!param_it->is_multiset && CmdValues[param_it->cmd].size() > 1) {
+      std::cerr << "Many values for parameter '" << param_it->prefix << "'"
+                << std::endl;
+      return false;
+    }
+    ParamCmd cmd;
+    if (FindFirstCmd(cmd) > 1) {
+      std::cerr << "Parameter '" << param_it->prefix << "' adds extra command"
+                << std::endl;
       return false;
     }
   }
+
   return true;
 }
 
 
+/*! Проверить параметры командной строки на корректность. Заполнить
+дополнительные переменные.
+\return Признак сформированных корректных параметров */
+bool CheckParameters() {
+  decltype(CmdValues.end()) l;
+  l = CmdValues.find(kCmdLayer);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    auto v = l->second[0].strvalue;
+    if (v == "sbs") {
+      cmd_layer = kLayerSbs;
+    } else if (v == "ou") {
+      cmd_layer = kLayerOu;
+    } else if (v == "mono") {
+      cmd_layer = kLayerMono;
+    } else {
+      std::cerr << "Unknown layer type '" << v << "'" << std::endl;
+      return false;
+    }
+  }
+
+  l = CmdValues.find(kCmdScreen);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    cmd_screen = l->second[0].strvalue;
+  }
+
+  if (CmdValues.find(kCmdSwapColor) != CmdValues.end()) {
+    cmd_swap_color = true;
+  }
+
+  if (CmdValues.find(kCmdSwapLayer) != CmdValues.end()) {
+    cmd_swap_layer = true;
+  }
+
+  l = CmdValues.find(kCmdEyes);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    cmd_eyes_distance = l->second[0].numvalue;
+  }
+
+  l = CmdValues.find(kCmdVision);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    auto v = l->second[0].strvalue;
+    if (v == "full") {
+      cmd_vision = kVisionFull;
+    } else if (v == "semi") {
+      cmd_vision = kVisionSemi;
+    } else if (v == "flat") {
+      cmd_vision = kVisionFlat;
+    } else {
+      std::cerr << "Unknown vision type '" << v << "'" << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
+void PrintHelp() { std::cout << kHelpMessage << std::endl; }
+
+
 /*! Выполнить команду play
 \return код возврата. 0 - если нет ошибок */
-int DoPlayCommand() {
+int DoPlayCommand(std::string fname) {
   auto vr = CreateHelmetView();
   if (!vr) {
     std::cerr << "PS VR Helmet not found" << std::endl;
@@ -252,8 +312,8 @@ int DoPlayCommand() {
     return 1;
   }
 
-  if (!vp->OpenMovie(cmd_play_fname)) {
-    std::cerr << "Can't open movie" << std::endl;
+  if (!vp->OpenMovie(fname)) {
+    std::cerr << "Can't open movie '" << fname << "'" << std::endl;
   }
 
   while (vp->GetMovieState() == IVideoPlayer::MovieState::kMovieParsing) {
@@ -321,7 +381,7 @@ Frame GenerateColors() {
 
 /*! Выполнить команду show
 \return код возврата. 0 - если нет ошибок */
-int DoShowCommand() {
+int DoShowCommand(std::string figure) {
   auto vr = CreateHelmetView();
   if (!vr) {
     std::cerr << "PS VR Helmet not found" << std::endl;
@@ -344,7 +404,7 @@ int DoShowCommand() {
 
   std::atomic_bool stop_show(false);
   std::condition_variable stop_var;
-  std::thread show_thread([&stop_show, &stop_var, trf]() {
+  std::thread show_thread([&stop_show, &stop_var, trf, figure]() {
     int fast_cycle_counter = 20;  //!< Счётчик частых показов (на старте)
     try {
       while (true) {
@@ -361,10 +421,13 @@ int DoShowCommand() {
         }
 
         Frame f(1000, 1000);
-        if (cmd_show_figure == "squares") {
+        if (figure == "squares") {
           f = GenerateSquares();
-        } else if (cmd_show_figure == "colors") {
+        } else if (figure == "colors") {
           f = GenerateColors();
+        } else {
+          std::cerr << "Unknown show figure '" << figure << "'" << std::endl;
+          stop_show = true;
         }
         trf->SetImage(std::move(f));
       }
@@ -387,41 +450,61 @@ int DoShowCommand() {
 
 
 int main(int argc, char** argv) {
-  if (!ParseCmd(argc, argv)) {
-    std::cerr << "-----" << std::endl;
+  if (!ParseCommandLine(argc, argv)) {
+    std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
     return 1;
   }
 
-  if (cmd_command == kCommandUnspecified) {
-    std::cerr << "A command must be specified" << std::endl;
-    std::cerr << "-----" << std::endl;
+  // Дополнительные проверки
+  ParamCmd cmd;
+  if (FindFirstCmd(cmd) != 1) {
+    std::cerr << "Command not specified" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
     return 1;
   }
 
-  if (cmd_command == kCommandHelp) {
+  if (!CheckParameters()) {
+    std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
-    return 0;
+    return 1;
   }
-  if (cmd_command == kCommandVersion) {
-    std::cout << kVersion << std::endl;
-    return 0;
-  }
-  if (cmd_command == kCommandListScreen) {
-    return PrintMonitors();
-  }
-  if (cmd_command == kCommandCalibration) {
-    auto vr = CreateHelmetCalibration();
-    std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
-    return 0;
-  }
-  if (cmd_command == kCommandShow) {
-    DoShowCommand();
-    return 0;
-  }
-  if (cmd_command == kCommandPlay) {
-    return DoPlayCommand();
+
+  int res = 0;
+  switch (cmd) {
+    case kCmdCalibration: {
+      auto vr = CreateHelmetCalibration();
+      std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
+    } break;
+    case kCmdHelp:
+      PrintHelp();
+      break;
+    case kCmdListScreens:
+      res = PrintMonitors();
+      break;
+    case kCmdPlay: {
+      auto l = CmdValues.find(kCmdPlay);
+      if (l != CmdValues.end()) {
+        for (auto it = l->second.begin(); it != l->second.end(); ++it) {
+          auto r = DoPlayCommand(it->strvalue);
+          if (res == 0) {
+            res = r;
+          }
+        }
+      }
+    } break;
+    case kCmdShow: {
+      auto l = CmdValues.find(kCmdShow);
+      if (l != CmdValues.end() && !l->second.empty()) {
+        DoShowCommand(l->second[0].strvalue);
+      }
+    } break;
+    case kCmdVersion:
+      std::cout << kVersion << std::endl;
+      break;
+    default:
+      assert(false);
   }
 
   return 0;
