@@ -99,6 +99,19 @@ std::array<CommandLineParam, 12> CmdParameters = {{
 
 std::map<ParamCmd, std::vector<CommandLineValue>> CmdValues;
 
+enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
+std::string cmd_screen;
+bool cmd_swap_color = false;
+bool cmd_swap_layer = false;
+int cmd_eyes_distance = kDefaultEyesDistance;
+
+enum CmdVision {
+  kVisionFull,
+  kVisionSemi,
+  kVisionFlat
+} cmd_vision = kVisionSemi;
+
+
 /*! Найти первую непустую команду в CmdValues
 \return количество непустых команд в CmdValues
 */
@@ -207,186 +220,69 @@ bool ParseCommandLine(int argc, char** argv) {
 }
 
 
-enum CmdCommand {
-  kCommandUnspecified,
-  kCommandListScreen,
-  kCommandHelp,
-  kCommandPlay,
-  kCommandVersion,
-  kCommandCalibration,
-  kCommandShow
-} cmd_command = kCommandUnspecified;
-
-std::string cmd_play_fname;
-std::string cmd_show_figure;
-
-enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
-
-std::string cmd_screen;
-bool cmd_swap_color = false;
-bool cmd_swap_layer = false;
-int cmd_eyes_distance = kDefaultEyesDistance;
-
-enum CmdVision {
-  kVisionFull,
-  kVisionSemi,
-  kVisionFlat
-} cmd_vision = kVisionSemi;
-
-void PrintHelp() { std::cout << kHelpMessage << std::endl; }
-
-/*! Проверяет аргумент (arg) на соответствие заголовку (header). Если есть
-совпадение, то в параметре tail возвращается  остаток строки.
-\return признак совпадения аргумента и заголовка */
-bool CheckArgument(
-    const std::string& arg, const char* header, std::string& tail) {
-  std::string h(header);
-  if (arg.substr(0, h.size()) != h) {
-    return false;
-  }
-  assert(arg.size() >= h.size());
-  tail = arg.substr(h.size());
-  return true;
-}
-
-/*! Разбор командной строки.
-\return признак успешного разбора (без ошибок) */
-bool ParseCmd(int argc, char** argv) {
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    std::string tail;
-
-    if (CheckArgument(arg, "--calibration", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandCalibration;
-    } else if (CheckArgument(arg, "--eyes=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      try {
-        cmd_eyes_distance = std::stoi(tail);
-        if (cmd_eyes_distance < 40 || cmd_eyes_distance > 100) {
-          std::cerr << "Eyes distance should be in range 40 .. 100"
-                    << std::endl;
-          return false;
-        }
-      } catch (std::exception) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-    } else if (CheckArgument(arg, "--help", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandHelp;
-    } else if (CheckArgument(arg, "--layer=", tail)) {
-      if (tail == "sbs") {
-        cmd_layer = kLayerSbs;
-      } else if (tail == "ou") {
-        cmd_layer = kLayerOu;
-      } else if (tail == "mono") {
-        cmd_layer = kLayerMono;
-      } else {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-    } else if (CheckArgument(arg, "--listscreens", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandListScreen;
-    } else if (CheckArgument(arg, "--play=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_play_fname = tail;
-      cmd_command = kCommandPlay;
-
-    } else if (CheckArgument(arg, "--screen=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_screen = tail;
-    } else if (CheckArgument(arg, "--show=", tail)) {
-      if (tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_show_figure = tail;
-      cmd_command = kCommandShow;
-    } else if (CheckArgument(arg, "--swapcolor", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_swap_color = true;
-    } else if (CheckArgument(arg, "--swaplayer", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_swap_layer = true;
-    } else if (CheckArgument(arg, "--version", tail)) {
-      if (!tail.empty()) {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
-      if (cmd_command != kCommandUnspecified) {
-        std::cerr << "Extra command '" << arg << "'" << std::endl;
-        return false;
-      }
-      cmd_command = kCommandVersion;
-    } else if (CheckArgument(arg, "--vision=", tail)) {
-      if (tail == "full") {
-        cmd_vision = kVisionFull;
-      } else if (tail == "semi") {
-        cmd_vision = kVisionSemi;
-      } else if (tail == "flat") {
-        cmd_vision = kVisionFlat;
-      } else {
-        std::cerr << "Unknown argument '" << arg << "'" << std::endl;
-        return false;
-      }
+/*! Проверить параметры командной строки на корректность. Заполнить
+дополнительные переменные.
+\return Признак сформированных корректных параметров */
+bool CheckParameters() {
+  decltype(CmdValues.end()) l;
+  l = CmdValues.find(kCmdLayer);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    auto v = l->second[0].strvalue;
+    if (v == "sbs") {
+      cmd_layer = kLayerSbs;
+    } else if (v == "ou") {
+      cmd_layer = kLayerOu;
+    } else if (v == "mono") {
+      cmd_layer = kLayerMono;
     } else {
-      std::cerr << "Unknown argument '" << arg << "'" << std::endl;
+      std::cerr << "Unknown layer type '" << v << "'" << std::endl;
       return false;
     }
   }
+
+  l = CmdValues.find(kCmdScreen);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    cmd_screen = l->second[0].strvalue;
+  }
+
+  if (CmdValues.find(kCmdSwapColor) != CmdValues.end()) {
+    cmd_swap_color = true;
+  }
+
+  if (CmdValues.find(kCmdSwapLayer) != CmdValues.end()) {
+    cmd_swap_layer = true;
+  }
+
+  l = CmdValues.find(kCmdEyes);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    cmd_eyes_distance = l->second[0].numvalue;
+  }
+
+  l = CmdValues.find(kCmdVision);
+  if (l != CmdValues.end() && !l->second.empty()) {
+    auto v = l->second[0].strvalue;
+    if (v == "full") {
+      cmd_vision = kVisionFull;
+    } else if (v == "semi") {
+      cmd_vision = kVisionSemi;
+    } else if (v == "flat") {
+      cmd_vision = kVisionFlat;
+    } else {
+      std::cerr << "Unknown vision type '" << v << "'" << std::endl;
+      return false;
+    }
+  }
+
   return true;
 }
+
+
+void PrintHelp() { std::cout << kHelpMessage << std::endl; }
 
 
 /*! Выполнить команду play
 \return код возврата. 0 - если нет ошибок */
-int DoPlayCommand() {
+int DoPlayCommand(std::string fname) {
   auto vr = CreateHelmetView();
   if (!vr) {
     std::cerr << "PS VR Helmet not found" << std::endl;
@@ -416,8 +312,8 @@ int DoPlayCommand() {
     return 1;
   }
 
-  if (!vp->OpenMovie(cmd_play_fname)) {
-    std::cerr << "Can't open movie" << std::endl;
+  if (!vp->OpenMovie(fname)) {
+    std::cerr << "Can't open movie '" << fname << "'" << std::endl;
   }
 
   while (vp->GetMovieState() == IVideoPlayer::MovieState::kMovieParsing) {
@@ -485,7 +381,7 @@ Frame GenerateColors() {
 
 /*! Выполнить команду show
 \return код возврата. 0 - если нет ошибок */
-int DoShowCommand() {
+int DoShowCommand(std::string figure) {
   auto vr = CreateHelmetView();
   if (!vr) {
     std::cerr << "PS VR Helmet not found" << std::endl;
@@ -508,7 +404,7 @@ int DoShowCommand() {
 
   std::atomic_bool stop_show(false);
   std::condition_variable stop_var;
-  std::thread show_thread([&stop_show, &stop_var, trf]() {
+  std::thread show_thread([&stop_show, &stop_var, trf, figure]() {
     int fast_cycle_counter = 20;  //!< Счётчик частых показов (на старте)
     try {
       while (true) {
@@ -525,10 +421,13 @@ int DoShowCommand() {
         }
 
         Frame f(1000, 1000);
-        if (cmd_show_figure == "squares") {
+        if (figure == "squares") {
           f = GenerateSquares();
-        } else if (cmd_show_figure == "colors") {
+        } else if (figure == "colors") {
           f = GenerateColors();
+        } else {
+          std::cerr << "Unknown show figure '" << figure << "'" << std::endl;
+          stop_show = true;
         }
         trf->SetImage(std::move(f));
       }
@@ -557,9 +456,16 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Дополнительные проверки
   ParamCmd cmd;
   if (FindFirstCmd(cmd) != 1) {
     std::cerr << "Command not specified" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+    PrintHelp();
+    return 1;
+  }
+
+  if (!CheckParameters()) {
     std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
     return 1;
@@ -577,12 +483,23 @@ int main(int argc, char** argv) {
     case kCmdListScreens:
       res = PrintMonitors();
       break;
-    case kCmdPlay:
-      res = DoPlayCommand();
-      break;
-    case kCmdShow:
-      DoShowCommand();
-      break;
+    case kCmdPlay: {
+      auto l = CmdValues.find(kCmdPlay);
+      if (l != CmdValues.end()) {
+        for (auto it = l->second.begin(); it != l->second.end(); ++it) {
+          auto r = DoPlayCommand(it->strvalue);
+          if (res == 0) {
+            res = r;
+          }
+        }
+      }
+    } break;
+    case kCmdShow: {
+      auto l = CmdValues.find(kCmdShow);
+      if (l != CmdValues.end() && !l->second.empty()) {
+        DoShowCommand(l->second[0].strvalue);
+      }
+    } break;
     case kCmdVersion:
       std::cout << kVersion << std::endl;
       break;
