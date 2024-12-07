@@ -1,8 +1,10 @@
 
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <iostream>
+#include <map>
 #include <thread>  // TODO Remove debug include
 
 #include "framepool.h"
@@ -35,13 +37,175 @@ const char kHelpMessage[] =
     "  --version - show version information and exit\n"
     "Options:\n"
     "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
-/*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
+    /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
     "  --screen=<position> - specify screen (by position) to play movie\n"
     "  --swapcolor - correct color\n"
     "  --swaplayer - correct order of layers\n"
-/*    "  --vision=full|semi|flat - specify area of vision\n" */
+    /*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
     "";
+
+enum ParamType { kEmptyValue, kStringValue, kNumberValue };
+
+enum ParamCmd {
+  kCmdCalibration,
+  kCmdEyes,
+  kCmdHelp,
+  kCmdLayer,
+  kCmdListScreens,
+  kCmdPlay,
+  kCmdScreen,
+  kCmdShow,
+  kCmdSwapColor,
+  kCmdSwapLayer,
+  kCmdVersion,
+  kCmdVision
+};
+
+const std::string kCmdPrefix = "--";
+const ParamCmd kEmptyPrefixCmd = kCmdPlay;
+
+struct CommandLineParam {
+  ParamCmd cmd;  // Выполняемая команда или изменяемый параметр
+  bool is_command;  // Признак, что параметр является командой (один тип на
+                    // командную строку)
+  bool is_multiset;  // Признак, что параметр можно указывать несколько раз
+  ParamType value_type;     // Тип параметра
+  std::string prefix;       // Заголовок параметра
+  std::string description;  // Описание параметра
+};
+
+struct CommandLineValue {
+  std::string strvalue;  // Строковое значение параметра
+  int numvalue;  // Числовое значение параметра (если выставлен numtype)
+};
+
+// clang-format off
+std::array<CommandLineParam, 12> CmdParameters = {{
+  {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
+  {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
+  {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
+  {kCmdLayer, false, false, kStringValue, "--layer=", "layer switcher"},
+  {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
+  {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
+  {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
+  {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
+  {kCmdSwapColor, false, false, kEmptyValue, "--swapcolor", "change color palette"},
+  {kCmdSwapLayer, false, false, kEmptyValue, "--swaplayer", "swap left/right view"},
+  {kCmdVersion, false, false, kEmptyValue, "--version", "show version information"},
+  {kCmdVision, false, false, kStringValue, "--vision=", "selects format of 3D movie"},
+}};
+// clang-format on
+
+std::map<ParamCmd, std::vector<CommandLineValue>> CmdValues;
+
+/*! Найти первую непустую команду в CmdValues
+\return количество непустых команд в CmdValues
+*/
+int FindFirstCmd(ParamCmd& cmd) {
+  int amount = 0;
+  for (auto it = CmdValues.begin(); it != CmdValues.end(); ++it) {
+    if (it->second.empty()) {
+      continue;
+    }
+    // Немного непроизводительно, но параметров мало
+    bool iscmd = false;
+    for (auto cit = CmdParameters.begin(); cit != CmdParameters.end(); ++cit) {
+      if (cit->cmd == it->first && cit->is_command) {
+        iscmd = true;
+        break;
+      }
+    }
+    if (!iscmd) {
+      continue;
+    }
+
+    // Это команда и она не пустая
+    if (amount == 0) {
+      cmd = it->first;
+    }
+    ++amount;
+  }
+  return amount;
+}
+
+/*! Разбор командной строки.
+\return признак успешного разбора (без ошибок) */
+bool ParseCommandLine(int argc, char** argv) {
+  CmdValues.clear();
+  for (int i = 1; i < argc; ++i) {
+    auto param_it = CmdParameters.end();
+    std::string param_tail = argv[i];
+    if (param_tail.substr(0, kCmdPrefix.size()) != kCmdPrefix) {
+      for (auto cit = CmdParameters.begin(); cit != CmdParameters.end();
+           ++cit) {
+        if (cit->cmd == kEmptyPrefixCmd) {
+          param_it = cit;
+        }
+      }
+    } else {
+      for (auto cit = CmdParameters.begin(); cit != CmdParameters.end();
+           ++cit) {
+        if (param_tail.substr(0, cit->prefix.size()) == cit->prefix) {
+          param_it = cit;
+          param_tail = param_tail.substr(cit->prefix.size());
+        }
+      }
+    }
+
+    if (param_it == CmdParameters.end()) {
+      std::cerr << "Unknown parameter '" << param_tail << "'" << std::endl;
+      return false;
+    }
+
+    CommandLineValue val;
+    val.strvalue = param_tail;
+    val.numvalue = 0;
+    switch (param_it->value_type) {
+      case kEmptyValue:
+        if (!param_tail.empty()) {
+          std::cerr << "Wrong format of parameter '" << param_it->prefix << "'"
+                    << std::endl;
+          return false;
+        }
+        break;
+      case kStringValue:
+        if (param_tail.empty()) {
+          std::cerr << "Empty value for parameter '" << param_it->prefix << "'"
+                    << std::endl;
+          return false;
+        }
+        break;
+      case kNumberValue:
+        try {
+          val.numvalue = std::stoi(param_tail);
+        } catch (...) {
+          std::cerr << "Wrong numerical value for parameter '"
+                    << param_it->prefix << "'" << std::endl;
+          return false;
+        }
+        break;
+      default:
+        assert(false);
+    }
+
+    CmdValues[param_it->cmd].push_back(val);
+    if (!param_it->is_multiset && CmdValues[param_it->cmd].size() > 1) {
+      std::cerr << "Many values for parameter '" << param_it->prefix << "'"
+                << std::endl;
+      return false;
+    }
+    ParamCmd cmd;
+    if (FindFirstCmd(cmd) > 1) {
+      std::cerr << "Parameter '" << param_it->prefix << "' adds extra command"
+                << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 enum CmdCommand {
   kCommandUnspecified,
@@ -387,41 +551,43 @@ int DoShowCommand() {
 
 
 int main(int argc, char** argv) {
-  if (!ParseCmd(argc, argv)) {
-    std::cerr << "-----" << std::endl;
+  if (!ParseCommandLine(argc, argv)) {
+    std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
     return 1;
   }
 
-  if (cmd_command == kCommandUnspecified) {
-    std::cerr << "A command must be specified" << std::endl;
-    std::cerr << "-----" << std::endl;
+  ParamCmd cmd;
+  if (FindFirstCmd(cmd) != 1) {
+    std::cerr << "Command not specified" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
     return 1;
   }
 
-  if (cmd_command == kCommandHelp) {
-    PrintHelp();
-    return 0;
-  }
-  if (cmd_command == kCommandVersion) {
-    std::cout << kVersion << std::endl;
-    return 0;
-  }
-  if (cmd_command == kCommandListScreen) {
-    return PrintMonitors();
-  }
-  if (cmd_command == kCommandCalibration) {
-    auto vr = CreateHelmetCalibration();
-    std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
-    return 0;
-  }
-  if (cmd_command == kCommandShow) {
-    DoShowCommand();
-    return 0;
-  }
-  if (cmd_command == kCommandPlay) {
-    return DoPlayCommand();
+  int res = 0;
+  switch (cmd) {
+    case kCmdCalibration: {
+      auto vr = CreateHelmetCalibration();
+      std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
+    } break;
+    case kCmdHelp:
+      PrintHelp();
+      break;
+    case kCmdListScreens:
+      res = PrintMonitors();
+      break;
+    case kCmdPlay:
+      res = DoPlayCommand();
+      break;
+    case kCmdShow:
+      DoShowCommand();
+      break;
+    case kCmdVersion:
+      std::cout << kVersion << std::endl;
+      break;
+    default:
+      assert(false);
   }
 
   return 0;
