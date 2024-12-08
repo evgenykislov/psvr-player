@@ -7,6 +7,7 @@
 #include <map>
 #include <thread>  // TODO Remove debug include
 
+#include "config_file.h"
 #include "framepool.h"
 #include "monitors.h"
 #include "play_screen.h"
@@ -19,22 +20,19 @@
 const int kCalibrationTimeout =
     20;  //!< Интервал калибровки сенсоров шлема, в секундах
 
-const int kDefaultEyesDistance = 66;  //!< Расстояние между окулярами в шлеме
 
-// TODO Add calibration command
-
+// clang-format off
 const char kHelpMessage[] =
     "3D Movie player for PS VR. Evgeny Kislov, 2024\n"
     "Usage:\n"
-    "  psvrplayer [options] command\n"
+    "  psvrplayer command [options] [moviefile ..]\n"
     "Commands:\n"
     "  --calibration - calibrate vr helmet device\n"
-    "  --listscreens - show list of available screens with their position and "
-    "exit\n"
-    "  --help - show this help and exit\n"
+    "  --listscreens - show list of available screens with their position\n"
+    "  --help - show this help\n"
     "  --play=<file-name> - play movie from specified file\n"
-    "  --show=squares|colorlines - show test figure, calibration image\n"
-    "  --version - show version information and exit\n"
+    "  --show=squares|colorlines - show test calibration image\n"
+    "  --version - show version information\n"
     "Options:\n"
     "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
     /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
@@ -44,6 +42,7 @@ const char kHelpMessage[] =
     /*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
     "";
+// clang-format on
 
 enum ParamType { kEmptyValue, kStringValue, kNumberValue };
 
@@ -103,7 +102,7 @@ enum CmdLayer { kLayerSbs, kLayerOu, kLayerMono } cmd_layer = kLayerSbs;
 std::string cmd_screen;
 bool cmd_swap_color = false;
 bool cmd_swap_layer = false;
-int cmd_eyes_distance = kDefaultEyesDistance;
+int cmd_eyes_distance = 0;
 
 enum CmdVision {
   kVisionFull,
@@ -244,6 +243,10 @@ bool CheckParameters() {
   if (l != CmdValues.end() && !l->second.empty()) {
     cmd_screen = l->second[0].strvalue;
   }
+  if (cmd_screen.empty()) {
+    std::cerr << "Needs to specify screen position" << std::endl;
+    return false;
+  }
 
   if (CmdValues.find(kCmdSwapColor) != CmdValues.end()) {
     cmd_swap_color = true;
@@ -256,6 +259,11 @@ bool CheckParameters() {
   l = CmdValues.find(kCmdEyes);
   if (l != CmdValues.end() && !l->second.empty()) {
     cmd_eyes_distance = l->second[0].numvalue;
+  }
+  if (cmd_eyes_distance < 40 && cmd_eyes_distance > 100) {
+    std::cerr << "Wrong interpupility distance. Set value in range 40 ... 100"
+              << std::endl;
+    return false;
   }
 
   l = CmdValues.find(kCmdVision);
@@ -450,6 +458,8 @@ int DoShowCommand(std::string figure) {
 
 
 int main(int argc, char** argv) {
+  GetOptions(&cmd_screen, &cmd_eyes_distance);
+
   if (!ParseCommandLine(argc, argv)) {
     std::cerr << "--------------------------------------" << std::endl;
     PrintHelp();
