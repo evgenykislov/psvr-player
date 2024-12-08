@@ -42,7 +42,8 @@ bool CreateConfigFileIfNotExist(bool force_clear) {
 }
 
 
-void SetOptions(std::string* screen, int* eyes_distance) {
+void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
+    bool* swap_layer) {
   if (!CreateConfigFileIfNotExist(false)) {
     return;
   }
@@ -53,7 +54,6 @@ void SetOptions(std::string* screen, int* eyes_distance) {
   } else {
     iniparser_set(dict, "Options", nullptr);
 
-
     if (screen) {
       iniparser_set(dict, "Options:screen", screen->c_str());
     }
@@ -61,6 +61,14 @@ void SetOptions(std::string* screen, int* eyes_distance) {
     if (eyes_distance) {
       std::string pe = std::to_string(*eyes_distance);
       iniparser_set(dict, "Options:eyes_distance", pe.c_str());
+    }
+
+    if (swap_color) {
+      iniparser_set(dict, "Options:swap_color", *swap_color ? "1" : "0");
+    }
+
+    if (swap_layer) {
+      iniparser_set(dict, "Options:swap_layer", *swap_layer ? "1" : "0");
     }
 
     auto f = fopen(fname.c_str(), "w+");
@@ -77,7 +85,8 @@ void SetOptions(std::string* screen, int* eyes_distance) {
   }
 }
 
-void GetOptions(std::string* screen, int* eyes_distance) {
+void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
+    bool* swap_layer) {
   auto fname = GetConfigFileName();
   auto dict = iniparser_load(fname.c_str());
   if (!dict) {
@@ -86,6 +95,12 @@ void GetOptions(std::string* screen, int* eyes_distance) {
     }
     if (eyes_distance) {
       *eyes_distance = kDefaultEyesDistance;
+    }
+    if (swap_color) {
+      *swap_color = false;
+    }
+    if (swap_layer) {
+      *swap_layer = false;
     }
   } else {
     // --- Screen
@@ -98,6 +113,17 @@ void GetOptions(std::string* screen, int* eyes_distance) {
       *eyes_distance =
           iniparser_getint(dict, "Options:eyes_distance", kDefaultEyesDistance);
     }
+
+    // --- Swap Color
+    if (swap_color) {
+      *swap_color = iniparser_getint(dict, "Options:swap_color", 0) != 0;
+    }
+
+    // --- Swap Layer
+    if (swap_layer) {
+      *swap_layer = iniparser_getint(dict, "Options:swap_layer", 0) != 0;
+    }
+
     iniparser_freedict(dict);
   }
 }

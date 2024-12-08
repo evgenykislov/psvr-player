@@ -452,7 +452,7 @@ int DoShowCommand(std::string figure) {
 
 
 int main(int argc, char** argv) {
-  GetOptions(&cmd_screen, &cmd_eyes_distance);
+  GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);
 
   if (!ParseCommandLine(argc, argv)) {
     std::cerr << "--------------------------------------" << std::endl;
@@ -487,9 +487,6 @@ int main(int argc, char** argv) {
     case kCmdListScreens:
       res = PrintMonitors();
       break;
-    case kCmdSave:
-      SetOptions(&cmd_screen, &cmd_eyes_distance);
-      break;
     case kCmdPlay: {
       auto l = CmdValues.find(kCmdPlay);
       if (l != CmdValues.end()) {
@@ -501,6 +498,10 @@ int main(int argc, char** argv) {
         }
       }
     } break;
+    case kCmdSave:
+      SetOptions(
+          &cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);
+      break;
     case kCmdShow: {
       auto l = CmdValues.find(kCmdShow);
       if (l != CmdValues.end() && !l->second.empty()) {
