@@ -54,6 +54,7 @@ enum ParamCmd {
   kCmdLayer,
   kCmdListScreens,
   kCmdPlay,
+  kCmdReset,
   kCmdSave,
   kCmdScreen,
   kCmdShow,
@@ -82,13 +83,14 @@ struct CommandLineValue {
 };
 
 // clang-format off
-std::array<CommandLineParam, 13> CmdParameters = {{
+std::array<CommandLineParam, 14> CmdParameters = {{
   {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
   {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
   {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
   {kCmdLayer, false, false, kStringValue, "--layer=", "layer switcher"},
   {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
   {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
+  {kCmdReset, true, false, kEmptyValue, "--reset", "reset saved options and calibration"},
   {kCmdSave, true, false, kEmptyValue, "--save", "save current option"},
   {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
   {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
@@ -498,6 +500,9 @@ int main(int argc, char** argv) {
         }
       }
     } break;
+    case kCmdReset:
+      ClearOptions();
+      break;
     case kCmdSave:
       SetOptions(
           &cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);

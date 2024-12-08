@@ -15,5 +15,7 @@ void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
 void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
     bool* swap_layer);
 
+/*! Очистить все сохранённые опции */
+void ClearOptions();
 
 #endif  // CONFIG_FILE_H

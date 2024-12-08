@@ -127,3 +127,5 @@ void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
     iniparser_freedict(dict);
   }
 }
+
+void ClearOptions() { CreateConfigFileIfNotExist(true); }
