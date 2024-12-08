@@ -51,11 +51,28 @@ void SetOptions(std::string* screen, int* eyes_distance) {
   if (!dict) {
     std::cerr << "Can't parse configuration file" << std::endl;
   } else {
+    iniparser_set(dict, "Options", nullptr);
+
+
     if (screen) {
-      std::string pe = std::to_string(*eyes_distance);
-      iniparser_set(dict, "screen", screen->c_str());
-      iniparser_set(dict, "eyes_distance", pe.c_str());
+      iniparser_set(dict, "Options:screen", screen->c_str());
     }
+
+    if (eyes_distance) {
+      std::string pe = std::to_string(*eyes_distance);
+      iniparser_set(dict, "Options:eyes_distance", pe.c_str());
+    }
+
+    auto f = fopen(fname.c_str(), "w+");
+    if (!f) {
+      std::cerr << "Can't open configuration file '" << fname << "'"
+                << std::endl;
+    } else {
+      iniparser_dump_ini(dict, f);
+      fclose(f);
+      std::cout << "Options are saved" << std::endl;
+    }
+
     iniparser_freedict(dict);
   }
 }
@@ -73,18 +90,13 @@ void GetOptions(std::string* screen, int* eyes_distance) {
   } else {
     // --- Screen
     if (screen) {
-      auto ps = iniparser_getstring(dict, "screen", nullptr);
-      if (ps) {
-        *screen = ps;
-      } else {
-        screen->clear();
-      }
+      *screen = iniparser_getstring(dict, "Options:screen", "");
     }
 
     // --- Eyes Distance
     if (eyes_distance) {
       *eyes_distance =
-          iniparser_getint(dict, "eyes_distance", kDefaultEyesDistance);
+          iniparser_getint(dict, "Options:eyes_distance", kDefaultEyesDistance);
     }
     iniparser_freedict(dict);
   }

@@ -31,10 +31,11 @@ const char kHelpMessage[] =
     "  --listscreens - show list of available screens with their position\n"
     "  --help - show this help\n"
     "  --play=<file-name> - play movie from specified file\n"
+    "  --save - save current options as default\n"
     "  --show=squares|colorlines - show test calibration image\n"
     "  --version - show version information\n"
     "Options:\n"
-    "  --eyes=<distance> - specify eyes distance. Default value: 66\n"
+    "  --eyes=<distance> - specify eyes distance\n"
     /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
     "  --screen=<position> - specify screen (by position) to play movie\n"
     "  --swapcolor - correct color\n"
@@ -53,6 +54,7 @@ enum ParamCmd {
   kCmdLayer,
   kCmdListScreens,
   kCmdPlay,
+  kCmdSave,
   kCmdScreen,
   kCmdShow,
   kCmdSwapColor,
@@ -80,13 +82,14 @@ struct CommandLineValue {
 };
 
 // clang-format off
-std::array<CommandLineParam, 12> CmdParameters = {{
+std::array<CommandLineParam, 13> CmdParameters = {{
   {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
   {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
   {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
   {kCmdLayer, false, false, kStringValue, "--layer=", "layer switcher"},
   {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
   {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
+  {kCmdSave, true, false, kEmptyValue, "--save", "save current option"},
   {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
   {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
   {kCmdSwapColor, false, false, kEmptyValue, "--swapcolor", "change color palette"},
@@ -243,10 +246,6 @@ bool CheckParameters() {
   if (l != CmdValues.end() && !l->second.empty()) {
     cmd_screen = l->second[0].strvalue;
   }
-  if (cmd_screen.empty()) {
-    std::cerr << "Needs to specify screen position" << std::endl;
-    return false;
-  }
 
   if (CmdValues.find(kCmdSwapColor) != CmdValues.end()) {
     cmd_swap_color = true;
@@ -259,11 +258,6 @@ bool CheckParameters() {
   l = CmdValues.find(kCmdEyes);
   if (l != CmdValues.end() && !l->second.empty()) {
     cmd_eyes_distance = l->second[0].numvalue;
-  }
-  if (cmd_eyes_distance < 40 && cmd_eyes_distance > 100) {
-    std::cerr << "Wrong interpupility distance. Set value in range 40 ... 100"
-              << std::endl;
-    return false;
   }
 
   l = CmdValues.find(kCmdVision);
@@ -492,6 +486,9 @@ int main(int argc, char** argv) {
       break;
     case kCmdListScreens:
       res = PrintMonitors();
+      break;
+    case kCmdSave:
+      SetOptions(&cmd_screen, &cmd_eyes_distance);
       break;
     case kCmdPlay: {
       auto l = CmdValues.find(kCmdPlay);
