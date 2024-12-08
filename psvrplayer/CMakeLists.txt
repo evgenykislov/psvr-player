@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(SOURCE_FILES
+  "config_file.cpp"
   "frame_buffer.cpp"
   "framepool.cpp"
   "main.cpp"
@@ -27,6 +28,7 @@ set(SOURCE_FILES
   )
 
 set(HEADER_FILES
+  "config_file.h"
   "frame_buffer.h"
   "framepool.h"
   "monitors.h"
