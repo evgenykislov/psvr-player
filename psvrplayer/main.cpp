@@ -38,7 +38,7 @@ const char kHelpMessage[] =
     "  --eyes=<distance> - specify eyes distance\n"
     /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
     "  --screen=<position> - specify screen (by position) to play movie\n"
-    "  --swapcolor - correct color\n"
+    /* "  --swapcolor - correct color\n" */
     "  --swaplayer - correct order of layers\n"
     /*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
