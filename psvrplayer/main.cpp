@@ -303,7 +303,21 @@ int DoPlayCommand(std::string fname) {
     return 1;
   }
 
-  auto trf = CreateTransformer(kLeftRight180, ps, vr);
+  TransformerScheme sch = kLeftRight180;
+  switch (cmd_vision) {
+    case kVisionSemi:
+      sch = kLeftRight180;
+      break;
+    case kVisionFull:
+      sch = kFlat3D;
+      break;
+    default:
+      std::cerr << "Flat and 180 views are supported now" << std::endl;
+      return 1;
+  }
+
+  // TODO Use shared_ptr instead of raw pointer
+  auto trf = CreateTransformer(sch, ps, vr);
   if (!trf) {
     return 1;
   }

@@ -137,6 +137,10 @@ class GlProgramm: public Transformer {
 
   void SchemeLeftRight180(const SceneParameters& params);
   void SchemeSingleImage(const SceneParameters& params);
+
+  /*! Разбор кадра как плоский 3D фильм
+  \param params параметры сцены и входные/выходные текстуры (через индексы) */
+  void SchemeFlat3D(const SceneParameters& params);
 };
 
 Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
@@ -151,8 +155,8 @@ Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
 GlProgramm::GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
     std::shared_ptr<IHelmet> helmet)
     : swap_eyes_setting_(false),
-      split_program_(0),
       eyes_correction_(0.0f),
+      split_program_(0),
       half_cilinder_program_(0) {
   scheme_settings_ = scheme;
   screen_ = screen;
@@ -338,6 +342,11 @@ void GlProgramm::Processing() {
       case kSingleImage:
         SchemeSingleImage(params);
         break;
+      case kFlat3D:
+        SchemeFlat3D(params);
+        break;
+      default:
+        assert(false);
     }
 
     int scrw, scrh;
@@ -571,4 +580,28 @@ void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
 void GlProgramm::SchemeSingleImage(const GlProgramm::SceneParameters& params) {
   SplitScreen(kSplitSingleImage, params.input_texture, params.left_scene,
       params.right_scene, params.width, params.align_width);
+}
+
+void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
+  if (params.swap_eyes) {
+    SplitScreen(kSplitLeftRight, params.input_texture, params.right_eye,
+        params.left_eye, params.width, params.align_width);
+  } else {
+    SplitScreen(kSplitLeftRight, params.input_texture, params.left_eye,
+        params.right_eye, params.width, params.align_width);
+  }
+
+  // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
+  // в горизонтальной плоскости (right_angle)
+  glm::mat4 r1 = glm::rotate(
+      glm::mat4(1.0f), (float)params.roll_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+  glm::mat4 r2 =
+      glm::rotate(r1, float(params.top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
+  glm::mat4 r3 =
+      glm::rotate(r2, float(params.right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+  auto transform = projection_matrix_ * r3;
+
+  HalfCilinder(params.left_eye, params.left_scene, transform);
+  HalfCilinder(params.right_eye, params.right_scene, transform);
 }
