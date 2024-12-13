@@ -304,20 +304,33 @@ int DoPlayCommand(std::string fname) {
   }
 
   TransformerScheme sch = kLeftRight180;
+  StreamsScheme ss = kLeftRightStreams;
   switch (cmd_vision) {
     case kVisionSemi:
       sch = kLeftRight180;
+      ss = kLeftRightStreams;
       break;
-    case kVisionFull:
+    case kVisionFlat:
       sch = kFlat3D;
+      switch (cmd_layer) {
+        case kLayerSbs:
+          ss = kLeftRightStreams;
+          break;
+        case kLayerOu:
+          ss = kUpDownStreams;
+          break;
+        case kLayerMono:
+          ss = kSingleStream;
+          break;
+      }
       break;
     default:
-      std::cerr << "Flat and 180 views are supported now" << std::endl;
+      std::cerr << "Flat and 180 views are supported only" << std::endl;
       return 1;
   }
 
   // TODO Use shared_ptr instead of raw pointer
-  auto trf = CreateTransformer(sch, ps, vr);
+  auto trf = CreateTransformer(sch, ss, ps, vr);
   if (!trf) {
     return 1;
   }
@@ -412,7 +425,7 @@ int DoShowCommand(std::string figure) {
     return 1;
   }
 
-  auto trf = CreateTransformer(kSingleImage, ps, vr);
+  auto trf = CreateTransformer(kSingleImage, kSingleStream, ps, vr);
   if (!trf) {
     return 1;
   }

@@ -27,6 +27,8 @@
 #include "play_screen.h"
 #include "shader_program.h"
 #include "vr_helmet.h"
+#include "shaders/flat.vert.h"
+#include "shaders/flat.frag.h"
 #include "shaders/halfcilinder.vert.h"
 #include "shaders/halfcilinder.frag.h"
 #include "shaders/output.vert.h"
@@ -42,13 +44,13 @@ struct VertexArray {
 };
 
 
-const double kPi = 3.1415926535897932384626433832795;
+// const double kPi = 3.1415926535897932384626433832795;
 
 
 class GlProgramm: public Transformer {
  public:
-  GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
-      std::shared_ptr<IHelmet> helmet);
+  GlProgramm(TransformerScheme scheme, StreamsScheme streams,
+      IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
@@ -89,6 +91,7 @@ class GlProgramm: public Transformer {
 
   std::thread transform_thread_;
   TransformerScheme scheme_settings_;
+  StreamsScheme streams_settings_;
   IPlayScreenPtr screen_;
   std::shared_ptr<IHelmet> helmet_;
 
@@ -111,6 +114,7 @@ class GlProgramm: public Transformer {
   // Переменные для работы только в функциях процессинга
   unsigned int split_program_;
   unsigned int half_cilinder_program_;
+  unsigned int flat_program_;
   glm::mat4 projection_matrix_;  //!< Проекционная матрица
   VertexArray cube_vertex_;  //!< Вершины для кубической сцены (формирование
                              //!< полусфер и т.д.)
@@ -123,8 +127,18 @@ class GlProgramm: public Transformer {
       const FrameBuffer& left, const FrameBuffer& right, unsigned int width,
       unsigned int aligned_width);
 
+  /*! Отрисовать входной буфер (in_buffer) натянутым на цилиндрическую
+  поверхность охватом в 180 градусов и результат выдать в выходной буфер
+  (out_buffer). Также применить повороты из матрицы трансформации (transform) */
   void HalfCilinder(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
       const glm::mat4& transform);
+
+  /*! Отрисовать входной буфер (in_buffer) натянутым на плоскость и
+  результат выдать в выходной буфер (out_buffer). Также применить повороты из
+  матрицы трансформации (transform) */
+  void RenderFlat(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
+      const glm::mat4& transform);
+
 
   /*! Удалить массив вершин */
   void DeleteVertex(VertexArray& vertex);
@@ -143,22 +157,24 @@ class GlProgramm: public Transformer {
   void SchemeFlat3D(const SceneParameters& params);
 };
 
-Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
-    std::shared_ptr<IHelmet> helmet) {
+Transformer* CreateTransformer(TransformerScheme scheme, StreamsScheme streams,
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet) {
   try {
-    return new GlProgramm(scheme, screen, helmet);
+    return new GlProgramm(scheme, streams, screen, helmet);
   } catch (...) {
   }
   return nullptr;
 }
 
-GlProgramm::GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
-    std::shared_ptr<IHelmet> helmet)
+GlProgramm::GlProgramm(TransformerScheme scheme, StreamsScheme streams,
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet)
     : swap_eyes_setting_(false),
       eyes_correction_(0.0f),
       split_program_(0),
-      half_cilinder_program_(0) {
+      half_cilinder_program_(0),
+      flat_program_(0) {
   scheme_settings_ = scheme;
+  streams_settings_ = streams;
   screen_ = screen;
   helmet_ = helmet;
   shutdown_flag_ = false;
@@ -256,6 +272,11 @@ void GlProgramm::Processing() {
           shaders_halfcilinder_vert_len, shaders_halfcilinder_frag,
           shaders_halfcilinder_frag_len)) {
     throw std::runtime_error("Can't create half cilinder program");
+  }
+
+  if (!CreateShaderProgram(flat_program_, shaders_flat_vert,
+          shaders_flat_vert_len, shaders_flat_frag, shaders_flat_frag_len)) {
+    throw std::runtime_error("Can't create flat program");
   }
 
   unsigned int output_program;
@@ -385,6 +406,7 @@ void GlProgramm::Processing() {
   DeleteFrameBuffer(params.right_eye);
   DeleteFrameBuffer(params.left_scene);
   DeleteFrameBuffer(params.right_scene);
+  DeleteShaderProgram(flat_program_);
   DeleteShaderProgram(split_program_);
   DeleteShaderProgram(half_cilinder_program_);
   DeleteShaderProgram(output_program);
@@ -464,6 +486,25 @@ void GlProgramm::HalfCilinder(const FrameBuffer& in_buffer,
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+
+void GlProgramm::RenderFlat(const FrameBuffer& in_buffer,
+    const FrameBuffer& out_buffer, const glm::mat4& transform) {
+  glBindFramebuffer(GL_FRAMEBUFFER, out_buffer.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glUseProgram(flat_program_);
+  glBindTexture(GL_TEXTURE_2D, in_buffer.texture);
+  auto tr_var = glGetUniformLocation(flat_program_, "transformation");
+  glUniformMatrix4fv(tr_var, 1, GL_TRUE, glm::value_ptr(transform));
+  glBindVertexArray(cube_vertex_.array_id);
+  glDrawArrays(GL_TRIANGLES, 0, cube_vertex_.array_size);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 
 void GlProgramm::DeleteVertex(VertexArray& vertex) {
   glDeleteVertexArrays(1, &vertex.array_id);
