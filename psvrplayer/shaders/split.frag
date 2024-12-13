@@ -18,6 +18,14 @@ void main()
     // Правая половина изображения
     image_pos.x = scene_pos.x / 4.0 + 0.75f;
     image_pos.y = 0.5f - scene_pos.y / 2.0f;
+  } else if (part_index == 2) {
+    // Верхняя половина изображения
+    image_pos.x = scene_pos.x / 2.0 + 0.5f;
+    image_pos.y = 0.25f - scene_pos.y / 4.0f;
+  } else if (part_index == 3) {
+    // Нижняя половина изображения
+    image_pos.x = scene_pos.x / 2.0 + 0.5f;
+    image_pos.y = 0.75f - scene_pos.y / 4.0f;
   } else if (part_index == 100) {
     // Изображение целиком
     image_pos.x = scene_pos.x / 2.0 + 0.5f;

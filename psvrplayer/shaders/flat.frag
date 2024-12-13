@@ -9,29 +9,24 @@ uniform sampler2D image;
 void main()
 {
   vec4 pos = scene_pos;
-  float x_angle;
-  float y_angle;
-  float l_hor; //!< Расстояние до отображаемой точки по горизонтали
+  float x_pos;
+  float y_pos;
+  float scale = 1.0; // Масштаб против угла обзора в 90 гр
 
-  if (scene_pos.z >= 0.0f) {
-    // Вид за спиной
+  if (scene_pos.z >= -0.001f) {
+    // Вид за спиной и боковая рамка
     color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
     return;
   }
 
-  if (scene_pos.x < scene_pos.z) {
-    // Левая часть. Ось x не равна 0
-    x_angle = atan(scene_pos.z / scene_pos.x);
-  } else if (scene_pos.x > -scene_pos.z) {
-    // Правая часть. Ось x не равна 0
-    x_angle = M_PI - atan(-scene_pos.z / scene_pos.x);
-  } else {
-    // Центральная часть. Ось z не равна 0
-    x_angle = M_PI / 2.0f + atan(scene_pos.x / -scene_pos.z);
+  x_pos = scene_pos.x / -scene_pos.z * scale / 2.0f + 0.5f;
+  y_pos = scene_pos.y / -scene_pos.z * scale / 2.0f + 0.5f;
+
+  if (x_pos < 0.0f || x_pos > 1.0f || y_pos < 0.0f || y_pos > 1.0f) {
+    // Выход за границы кадра
+    color = vec4(0.0f, 0.0f, 1.0f, 0.0f);
+    return;
   }
 
-  l_hor = sqrt(scene_pos.x * scene_pos.x + scene_pos.z * scene_pos.z);
-  y_angle = M_PI / 2.0f + atan(scene_pos.y / l_hor);
-
-  color = texture(image, vec2(x_angle / M_PI , y_angle / M_PI));
+  color = texture(image, vec2(x_pos , y_pos));
 }

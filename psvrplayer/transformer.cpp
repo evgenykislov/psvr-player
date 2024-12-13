@@ -66,7 +66,7 @@ class GlProgramm: public Transformer {
   GlProgramm& operator=(GlProgramm&&) = delete;
 
   // TODO description???
-  enum SplitScheme { kSplitSingleImage, kSplitLeftRight };
+  enum SplitScheme { kSplitSingleImage, kSplitLeftRight, kSplitUpDown };
 
   // Описание всех параметров для построения сцены
   // Заполняется и используется только в потоке трансформации и отображения
@@ -123,9 +123,8 @@ class GlProgramm: public Transformer {
   void Processing();
 
   // TODO ???
-  void SplitScreen(SplitScheme scheme, unsigned int texture,
-      const FrameBuffer& left, const FrameBuffer& right, unsigned int width,
-      unsigned int aligned_width);
+  void SplitScreen(unsigned int texture, const FrameBuffer& left,
+      const FrameBuffer& right, unsigned int width, unsigned int aligned_width);
 
   /*! Отрисовать входной буфер (in_buffer) натянутым на цилиндрическую
   поверхность охватом в 180 градусов и результат выдать в выходной буфер
@@ -415,19 +414,22 @@ void GlProgramm::Processing() {
   DeleteVertex(flat_vertex_);
 }
 
-void GlProgramm::SplitScreen(SplitScheme scheme, unsigned int texture,
-    const FrameBuffer& left, const FrameBuffer& right, unsigned int width,
-    unsigned int aligned_width) {
+void GlProgramm::SplitScreen(unsigned int texture, const FrameBuffer& left,
+    const FrameBuffer& right, unsigned int width, unsigned int aligned_width) {
   // Разделим текстуру на две
   GLint loc;
   GLint left_sc, right_sc;
 
-  switch (scheme) {
-    case kSplitLeftRight:
+  switch (streams_settings_) {
+    case kLeftRightStreams:
       left_sc = 0;
       right_sc = 1;
       break;
-    case kSplitSingleImage:
+    case kUpDownStreams:
+      left_sc = 2;
+      right_sc = 3;
+      break;
+    case kSingleStream:
       left_sc = 100;
       right_sc = 100;
       break;
@@ -596,11 +598,11 @@ bool GlProgramm::CreateFlatVertex(VertexArray& vertex) {
 
 void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
   if (params.swap_eyes) {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.right_eye,
-        params.left_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.right_eye, params.left_eye,
+        params.width, params.align_width);
   } else {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.left_eye,
-        params.right_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.left_eye, params.right_eye,
+        params.width, params.align_width);
   }
 
   // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
@@ -619,17 +621,17 @@ void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
 }
 
 void GlProgramm::SchemeSingleImage(const GlProgramm::SceneParameters& params) {
-  SplitScreen(kSplitSingleImage, params.input_texture, params.left_scene,
-      params.right_scene, params.width, params.align_width);
+  SplitScreen(params.input_texture, params.left_scene, params.right_scene,
+      params.width, params.align_width);
 }
 
 void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
   if (params.swap_eyes) {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.right_eye,
-        params.left_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.right_eye, params.left_eye,
+        params.width, params.align_width);
   } else {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.left_eye,
-        params.right_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.left_eye, params.right_eye,
+        params.width, params.align_width);
   }
 
   // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
@@ -643,6 +645,6 @@ void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
 
   auto transform = projection_matrix_ * r3;
 
-  HalfCilinder(params.left_eye, params.left_scene, transform);
-  HalfCilinder(params.right_eye, params.right_scene, transform);
+  RenderFlat(params.left_eye, params.left_scene, transform);
+  RenderFlat(params.right_eye, params.right_scene, transform);
 }
