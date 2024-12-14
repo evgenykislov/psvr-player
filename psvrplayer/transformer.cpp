@@ -27,6 +27,8 @@
 #include "play_screen.h"
 #include "shader_program.h"
 #include "vr_helmet.h"
+#include "shaders/flat.vert.h"
+#include "shaders/flat.frag.h"
 #include "shaders/halfcilinder.vert.h"
 #include "shaders/halfcilinder.frag.h"
 #include "shaders/output.vert.h"
@@ -42,13 +44,13 @@ struct VertexArray {
 };
 
 
-const double kPi = 3.1415926535897932384626433832795;
+// const double kPi = 3.1415926535897932384626433832795;
 
 
 class GlProgramm: public Transformer {
  public:
-  GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
-      std::shared_ptr<IHelmet> helmet);
+  GlProgramm(TransformerScheme scheme, StreamsScheme streams,
+      IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
   ~GlProgramm();
 
   void SetImage(Frame&& frame) override;
@@ -64,7 +66,7 @@ class GlProgramm: public Transformer {
   GlProgramm& operator=(GlProgramm&&) = delete;
 
   // TODO description???
-  enum SplitScheme { kSplitSingleImage, kSplitLeftRight };
+  enum SplitScheme { kSplitSingleImage, kSplitLeftRight, kSplitUpDown };
 
   // Описание всех параметров для построения сцены
   // Заполняется и используется только в потоке трансформации и отображения
@@ -89,6 +91,7 @@ class GlProgramm: public Transformer {
 
   std::thread transform_thread_;
   TransformerScheme scheme_settings_;
+  StreamsScheme streams_settings_;
   IPlayScreenPtr screen_;
   std::shared_ptr<IHelmet> helmet_;
 
@@ -111,6 +114,7 @@ class GlProgramm: public Transformer {
   // Переменные для работы только в функциях процессинга
   unsigned int split_program_;
   unsigned int half_cilinder_program_;
+  unsigned int flat_program_;
   glm::mat4 projection_matrix_;  //!< Проекционная матрица
   VertexArray cube_vertex_;  //!< Вершины для кубической сцены (формирование
                              //!< полусфер и т.д.)
@@ -119,12 +123,22 @@ class GlProgramm: public Transformer {
   void Processing();
 
   // TODO ???
-  void SplitScreen(SplitScheme scheme, unsigned int texture,
-      const FrameBuffer& left, const FrameBuffer& right, unsigned int width,
-      unsigned int aligned_width);
+  void SplitScreen(unsigned int texture, const FrameBuffer& left,
+      const FrameBuffer& right, unsigned int width, unsigned int aligned_width);
 
+  /*! Отрисовать входной буфер (in_buffer) натянутым на цилиндрическую
+  поверхность охватом в 180 градусов и результат выдать в выходной буфер
+  (out_buffer). Также применить повороты из матрицы трансформации (transform) */
   void HalfCilinder(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
       const glm::mat4& transform);
+
+  /*! Отрисовать входной буфер (in_buffer) натянутым на плоскость и
+  результат выдать в выходной буфер (out_buffer). Также применить повороты из
+  матрицы трансформации (transform)
+  \param width2height отношение ширины к высоте для рендеринга изображения */
+  void RenderFlat(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
+      const glm::mat4& transform, double width2height);
+
 
   /*! Удалить массив вершин */
   void DeleteVertex(VertexArray& vertex);
@@ -137,24 +151,30 @@ class GlProgramm: public Transformer {
 
   void SchemeLeftRight180(const SceneParameters& params);
   void SchemeSingleImage(const SceneParameters& params);
+
+  /*! Разбор кадра как плоский 3D фильм
+  \param params параметры сцены и входные/выходные текстуры (через индексы) */
+  void SchemeFlat3D(const SceneParameters& params);
 };
 
-Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
-    std::shared_ptr<IHelmet> helmet) {
+Transformer* CreateTransformer(TransformerScheme scheme, StreamsScheme streams,
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet) {
   try {
-    return new GlProgramm(scheme, screen, helmet);
+    return new GlProgramm(scheme, streams, screen, helmet);
   } catch (...) {
   }
   return nullptr;
 }
 
-GlProgramm::GlProgramm(TransformerScheme scheme, IPlayScreenPtr screen,
-    std::shared_ptr<IHelmet> helmet)
+GlProgramm::GlProgramm(TransformerScheme scheme, StreamsScheme streams,
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet)
     : swap_eyes_setting_(false),
-      split_program_(0),
       eyes_correction_(0.0f),
-      half_cilinder_program_(0) {
+      split_program_(0),
+      half_cilinder_program_(0),
+      flat_program_(0) {
   scheme_settings_ = scheme;
+  streams_settings_ = streams;
   screen_ = screen;
   helmet_ = helmet;
   shutdown_flag_ = false;
@@ -254,6 +274,11 @@ void GlProgramm::Processing() {
     throw std::runtime_error("Can't create half cilinder program");
   }
 
+  if (!CreateShaderProgram(flat_program_, shaders_flat_vert,
+          shaders_flat_vert_len, shaders_flat_frag, shaders_flat_frag_len)) {
+    throw std::runtime_error("Can't create flat program");
+  }
+
   unsigned int output_program;
   if (!CreateShaderProgram(output_program, shaders_output_vert,
           shaders_output_vert_len, shaders_output_frag,
@@ -338,6 +363,11 @@ void GlProgramm::Processing() {
       case kSingleImage:
         SchemeSingleImage(params);
         break;
+      case kFlat3D:
+        SchemeFlat3D(params);
+        break;
+      default:
+        assert(false);
     }
 
     int scrw, scrh;
@@ -376,6 +406,7 @@ void GlProgramm::Processing() {
   DeleteFrameBuffer(params.right_eye);
   DeleteFrameBuffer(params.left_scene);
   DeleteFrameBuffer(params.right_scene);
+  DeleteShaderProgram(flat_program_);
   DeleteShaderProgram(split_program_);
   DeleteShaderProgram(half_cilinder_program_);
   DeleteShaderProgram(output_program);
@@ -384,19 +415,22 @@ void GlProgramm::Processing() {
   DeleteVertex(flat_vertex_);
 }
 
-void GlProgramm::SplitScreen(SplitScheme scheme, unsigned int texture,
-    const FrameBuffer& left, const FrameBuffer& right, unsigned int width,
-    unsigned int aligned_width) {
+void GlProgramm::SplitScreen(unsigned int texture, const FrameBuffer& left,
+    const FrameBuffer& right, unsigned int width, unsigned int aligned_width) {
   // Разделим текстуру на две
   GLint loc;
   GLint left_sc, right_sc;
 
-  switch (scheme) {
-    case kSplitLeftRight:
+  switch (streams_settings_) {
+    case kLeftRightStreams:
       left_sc = 0;
       right_sc = 1;
       break;
-    case kSplitSingleImage:
+    case kUpDownStreams:
+      left_sc = 2;
+      right_sc = 3;
+      break;
+    case kSingleStream:
       left_sc = 100;
       right_sc = 100;
       break;
@@ -455,6 +489,30 @@ void GlProgramm::HalfCilinder(const FrameBuffer& in_buffer,
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+
+void GlProgramm::RenderFlat(const FrameBuffer& in_buffer,
+    const FrameBuffer& out_buffer, const glm::mat4& transform,
+    double width2height) {
+  glBindFramebuffer(GL_FRAMEBUFFER, out_buffer.buffer);
+  glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glUseProgram(flat_program_);
+  glBindTexture(GL_TEXTURE_2D, in_buffer.texture);
+  auto tr_var = glGetUniformLocation(flat_program_, "transformation");
+  glUniformMatrix4fv(tr_var, 1, GL_TRUE, glm::value_ptr(transform));
+  tr_var = glGetUniformLocation(flat_program_, "width2height");
+  assert(tr_var != -1);
+  glUniform1f(tr_var, (float)width2height);
+
+  glBindVertexArray(cube_vertex_.array_id);
+  glDrawArrays(GL_TRIANGLES, 0, cube_vertex_.array_size);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindVertexArray(0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 
 void GlProgramm::DeleteVertex(VertexArray& vertex) {
   glDeleteVertexArrays(1, &vertex.array_id);
@@ -546,11 +604,11 @@ bool GlProgramm::CreateFlatVertex(VertexArray& vertex) {
 
 void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
   if (params.swap_eyes) {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.right_eye,
-        params.left_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.right_eye, params.left_eye,
+        params.width, params.align_width);
   } else {
-    SplitScreen(kSplitLeftRight, params.input_texture, params.left_eye,
-        params.right_eye, params.width, params.align_width);
+    SplitScreen(params.input_texture, params.left_eye, params.right_eye,
+        params.width, params.align_width);
   }
 
   // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
@@ -569,6 +627,32 @@ void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
 }
 
 void GlProgramm::SchemeSingleImage(const GlProgramm::SceneParameters& params) {
-  SplitScreen(kSplitSingleImage, params.input_texture, params.left_scene,
-      params.right_scene, params.width, params.align_width);
+  SplitScreen(params.input_texture, params.left_scene, params.right_scene,
+      params.width, params.align_width);
+}
+
+void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
+  if (params.swap_eyes) {
+    SplitScreen(params.input_texture, params.right_eye, params.left_eye,
+        params.width, params.align_width);
+  } else {
+    SplitScreen(params.input_texture, params.left_eye, params.right_eye,
+        params.width, params.align_width);
+  }
+
+  // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
+  // в горизонтальной плоскости (right_angle)
+  glm::mat4 r1 = glm::rotate(
+      glm::mat4(1.0f), (float)params.roll_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+  glm::mat4 r2 =
+      glm::rotate(r1, float(params.top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
+  glm::mat4 r3 =
+      glm::rotate(r2, float(params.right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+  auto transform = projection_matrix_ * r3;
+
+  auto w2h = double(params.width) / double(params.height);
+
+  RenderFlat(params.left_eye, params.left_scene, transform, w2h);
+  RenderFlat(params.right_eye, params.right_scene, transform, w2h);
 }

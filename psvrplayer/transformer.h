@@ -9,9 +9,17 @@ class IHelmet;
 enum TransformerScheme {
   kSingleImage,  // Одно целиковое изображение. Показывается на два глаза без
                  // объёма
-  kLeftRight180  // Изображение из двух частей: левая половина на левый глаз,
-                 // правая половина на правый глаз. Показывается в полусфере 180
-                 // градусов
+  kLeftRight180,  // Изображение из двух частей: левая половина на левый глаз,
+                  // правая половина на правый глаз. Показывается в полусфере
+                  // 180 градусов
+  kFlat3D  // Изображение из двух частей. Показывается в плоскости (3D
+           // кинотеатр)
+};
+
+enum StreamsScheme {
+  kLeftRightStreams,  // Изображение из двух частей: левая и правая
+  kUpDownStreams,  // Изображение из двух частей: верхняя и нижняя
+  kSingleStream  // Изображение цельное, без деления на части
 };
 
 /*! Класс для трансформации изображения */
@@ -34,7 +42,7 @@ class Transformer {
 };
 
 // TODO Сделать shared_ptr
-Transformer* CreateTransformer(TransformerScheme scheme, IPlayScreenPtr screen,
-    std::shared_ptr<IHelmet> helmet);
+Transformer* CreateTransformer(TransformerScheme scheme, StreamsScheme streams,
+    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
 
 #endif  // TRANSFORMER_H

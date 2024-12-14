@@ -46,6 +46,8 @@ set(HEADER_FILES
   )
 
 set(COMPILED_RESOURCES
+  "shaders/flat.frag"
+  "shaders/flat.vert"
   "shaders/halfcilinder.frag"
   "shaders/halfcilinder.vert"
   "shaders/output.frag"
