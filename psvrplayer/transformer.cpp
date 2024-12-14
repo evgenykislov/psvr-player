@@ -134,9 +134,10 @@ class GlProgramm: public Transformer {
 
   /*! Отрисовать входной буфер (in_buffer) натянутым на плоскость и
   результат выдать в выходной буфер (out_buffer). Также применить повороты из
-  матрицы трансформации (transform) */
+  матрицы трансформации (transform)
+  \param width2height отношение ширины к высоте для рендеринга изображения */
   void RenderFlat(const FrameBuffer& in_buffer, const FrameBuffer& out_buffer,
-      const glm::mat4& transform);
+      const glm::mat4& transform, double width2height);
 
 
   /*! Удалить массив вершин */
@@ -491,7 +492,8 @@ void GlProgramm::HalfCilinder(const FrameBuffer& in_buffer,
 
 
 void GlProgramm::RenderFlat(const FrameBuffer& in_buffer,
-    const FrameBuffer& out_buffer, const glm::mat4& transform) {
+    const FrameBuffer& out_buffer, const glm::mat4& transform,
+    double width2height) {
   glBindFramebuffer(GL_FRAMEBUFFER, out_buffer.buffer);
   glViewport(0, 0, FrameBuffer::texture_size, FrameBuffer::texture_size);
   glClearColor(0, 0, 0, 0);
@@ -500,6 +502,10 @@ void GlProgramm::RenderFlat(const FrameBuffer& in_buffer,
   glBindTexture(GL_TEXTURE_2D, in_buffer.texture);
   auto tr_var = glGetUniformLocation(flat_program_, "transformation");
   glUniformMatrix4fv(tr_var, 1, GL_TRUE, glm::value_ptr(transform));
+  tr_var = glGetUniformLocation(flat_program_, "width2height");
+  assert(tr_var != -1);
+  glUniform1f(tr_var, (float)width2height);
+
   glBindVertexArray(cube_vertex_.array_id);
   glDrawArrays(GL_TRIANGLES, 0, cube_vertex_.array_size);
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -645,6 +651,8 @@ void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
 
   auto transform = projection_matrix_ * r3;
 
-  RenderFlat(params.left_eye, params.left_scene, transform);
-  RenderFlat(params.right_eye, params.right_scene, transform);
+  auto w2h = double(params.width) / double(params.height);
+
+  RenderFlat(params.left_eye, params.left_scene, transform, w2h);
+  RenderFlat(params.right_eye, params.right_scene, transform, w2h);
 }

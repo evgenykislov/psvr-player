@@ -5,6 +5,7 @@
 out vec4 color;
 in vec4 scene_pos;
 uniform sampler2D image;
+uniform float width2height;
 
 void main()
 {
@@ -20,11 +21,22 @@ void main()
   }
 
   x_pos = scene_pos.x / -scene_pos.z * scale / 2.0f + 0.5f;
-  y_pos = scene_pos.y / -scene_pos.z * scale / 2.0f + 0.5f;
+  y_pos = scene_pos.y / -scene_pos.z * scale / 2.0f * width2height + 0.5f;
 
-  if (x_pos < 0.0f || x_pos > 1.0f || y_pos < 0.0f || y_pos > 1.0f) {
-    // Выход за границы кадра
-    color = vec4(0.0f, 0.0f, 1.0f, 0.0f);
+  if (x_pos < 0.0f || x_pos > 1.0f || y_pos > 1.0f) {
+    // Выход за боковые и верхние границы кадра
+    color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  if (y_pos < 0.0f) {
+    // Выход за нижнюю границу кадра
+    // Рисуем "полоску", чтобы не совсем пусто было
+    float amb = 0.0f;
+    if (y_pos > -0.1) {
+      amb = 0.02f + y_pos * 0.2f;
+    }
+    color = vec4(amb, amb, amb, 0.0f);
     return;
   }
 
