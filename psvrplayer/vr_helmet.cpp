@@ -66,6 +66,10 @@ int DoHelmetDeviceCalibration() {
     }
     std::this_thread::sleep_for(
         std::chrono::seconds(kCalibrationTimeout - kCalibrationInterval));
+    if (!vr->DoneCalibration()) {
+      std::cerr << "Calibration faiiled" << std::endl;
+      return 1;
+    }
     vr.reset();
     return 0;
   } catch (...) {
