@@ -41,6 +41,11 @@
 #include "vr_helmet_calibration.h"
 #include "vr_helmet_view.h"
 
+const int kCalibrationInterval =
+    2;  //!< интервал для проверки данных, в секундах
+const int kCalibrationTimeout =
+    20;  //!< Интервал калибровки сенсоров шлема, в секундах
+
 
 std::shared_ptr<IHelmet> CreateHelmetView() {
   try {
@@ -51,10 +56,19 @@ std::shared_ptr<IHelmet> CreateHelmetView() {
 }
 
 
-std::shared_ptr<IHelmet> CreateHelmetCalibration() {
+int DoHelmetDeviceCalibration() {
   try {
-    return std::shared_ptr<PsvrHelmetCalibration>(new PsvrHelmetCalibration);
+    auto vr = std::shared_ptr<PsvrHelmetCalibration>(new PsvrHelmetCalibration);
+    std::this_thread::sleep_for(std::chrono::seconds(kCalibrationInterval));
+    if (!vr->IsDataAvailable()) {
+      std::cerr << "Helmet data is not available" << std::endl;
+      return 1;
+    }
+    std::this_thread::sleep_for(
+        std::chrono::seconds(kCalibrationTimeout - kCalibrationInterval));
+    vr.reset();
+    return 0;
   } catch (...) {
   }
-  return std::shared_ptr<IHelmet>();
+  return 1;
 }

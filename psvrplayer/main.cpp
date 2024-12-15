@@ -1,4 +1,4 @@
-
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -16,9 +16,6 @@
 #include "version.h"
 #include "video_player.h"
 #include "vr_helmet.h"
-
-const int kCalibrationTimeout =
-    20;  //!< Интервал калибровки сенсоров шлема, в секундах
 
 
 // clang-format off
@@ -43,6 +40,13 @@ const char kHelpMessage[] =
     /*    "  --vision=full|semi|flat - specify area of vision\n" */
     "More information see on https://apoheliy.com/psvrplayer/\n"
     "";
+
+const char kCalibrationMessage[] = "Helmet sensors calibration.\n"
+    "It takes about 20 seconds to calibration process.\n"
+    "Place the helmet on a stable horizontal surface and then print yes.\n"
+    "To cancel the calibration, print no.\n"
+    "Start calibration? [yes]:";
+
 // clang-format on
 
 enum ParamType { kEmptyValue, kStringValue, kNumberValue };
@@ -480,6 +484,32 @@ int DoShowCommand(std::string figure) {
 }
 
 
+/*! Выполнить калибровку шлема
+\return код возврата. 0 - если нет ошибок */
+int DoCalibration() {
+  std::cout << kCalibrationMessage << std::flush;
+  std::string inp;
+
+  std::getline(std::cin, inp);
+  std::transform(inp.begin(), inp.end(), inp.begin(),
+      [](unsigned char c) { return std::tolower(c); });
+
+  if (inp.empty() | inp == "yes" | inp == "y") {
+    std::cout << "Calibration ..." << std::endl;
+    int res = DoHelmetDeviceCalibration();
+    if (res == 0) {
+      std::cout << "Calibration completed" << std::endl;
+    } else {
+      std::cerr << "Calibration failed" << std::endl;
+    }
+    return res;
+  } else {
+    std::cout << "Calibration cancelled" << std::endl;
+  }
+
+  return 0;
+}
+
 int main(int argc, char** argv) {
   GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);
 
@@ -506,10 +536,9 @@ int main(int argc, char** argv) {
 
   int res = 0;
   switch (cmd) {
-    case kCmdCalibration: {
-      auto vr = CreateHelmetCalibration();
-      std::this_thread::sleep_for(std::chrono::seconds(kCalibrationTimeout));
-    } break;
+    case kCmdCalibration:
+      return DoCalibration();
+      break;
     case kCmdHelp:
       PrintHelp();
       break;
