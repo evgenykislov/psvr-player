@@ -42,7 +42,7 @@ const char kHelpMessage[] =
     "";
 
 const char kCalibrationMessage[] = "Helmet sensors calibration.\n"
-    "It takes about 20 seconds to calibration process.\n"
+    "It takes about 30 seconds to calibration process.\n"
     "Place the helmet on a stable horizontal surface and then print yes.\n"
     "To cancel the calibration, print no.\n"
     "Start calibration? [yes]:";

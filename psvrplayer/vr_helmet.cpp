@@ -44,7 +44,7 @@
 const int kCalibrationInterval =
     2;  //!< интервал для проверки данных, в секундах
 const int kCalibrationTimeout =
-    20;  //!< Интервал калибровки сенсоров шлема, в секундах
+    30;  //!< Интервал калибровки сенсоров шлема, в секундах
 
 
 std::shared_ptr<IHelmet> CreateHelmetView() {
