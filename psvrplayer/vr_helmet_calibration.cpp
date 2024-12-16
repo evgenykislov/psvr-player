@@ -42,8 +42,7 @@ PsvrHelmetCalibration::PsvrHelmetCalibration()
   }
 }
 
-
-PsvrHelmetCalibration::~PsvrHelmetCalibration() {
+bool PsvrHelmetCalibration::DoneCalibration() {
   int64_t tr, tt, tc, dc;
   std::unique_lock<std::mutex> lk(data_lock_);
   tr = to_right_summ_;
@@ -54,7 +53,7 @@ PsvrHelmetCalibration::~PsvrHelmetCalibration() {
 
   if (dc < kMinDataCount) {
     std::cerr << "ERROR: Low data from helmet. Calibration failed" << std::endl;
-    return;
+    return false;
   }
 
   auto dict = iniparser_load(config_fname_.c_str());
@@ -82,11 +81,22 @@ PsvrHelmetCalibration::~PsvrHelmetCalibration() {
         iniparser_dump_ini(dict, f);
         fclose(f);
         std::cout << "Calibration completed" << std::endl;
+        return true;
       }
     }
     iniparser_freedict(dict);
   }
+  return false;
 }
+
+bool PsvrHelmetCalibration::IsDataAvailable() {
+  int64_t dc = 0;
+  std::unique_lock<std::mutex> lk(data_lock_);
+  dc = data_counter_;
+  lk.unlock();
+  return dc > kMinDataCount;
+}
+
 
 void PsvrHelmetCalibration::OnSensorsData(
     double to_right, double to_top, double to_clockwork, uint64_t) {

@@ -40,6 +40,6 @@ class IHelmet {
 
 std::shared_ptr<IHelmet> CreateHelmetView();
 
-std::shared_ptr<IHelmet> CreateHelmetCalibration();
+int DoHelmetDeviceCalibration();
 
 #endif  // VR_HELMET_H
