@@ -13,6 +13,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
+#include "rotation.h"
 #include "vr_helmet.h"
 #include "vr_helmet_hid.h"
 
@@ -26,8 +27,7 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
 
   void SetVRMode(VRMode mode) override;
   void CenterView() override;
-  void GetViewPoint(
-      double& right_angle, double& top_angle, double& clock_angle) override;
+  void GetViewPoint(glm::mat4& rotation) override;
 
  protected:
   virtual void OnSensorsData(double to_right, double to_top,
@@ -39,23 +39,13 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
   PsvrHelmetView& operator=(const PsvrHelmetView&) = delete;
   PsvrHelmetView& operator=(PsvrHelmetView&&) = delete;
 
-  using vec3d = glm::vec<3, double, glm::defaultp>;
 
-  const double kNearZeroLength2 =
-      1.0e-8;  //!< Длина очень короткого вектора. При расчётах углов означает
-               //!< взгляд ровно вверх или вниз
   const int64_t kFixedPointFactor = 1000000000L;
 
+  using vec3d = glm::vec<3, double, glm::defaultp>;
 
   std::atomic_bool center_view_flag_;
   uint64_t last_sensor_time_;
-
-  vec3d helm_forward =
-      vec3d(0.0, 0.0, 1.0);  //!< Вектор указывает куда смотрит (вперёд) шлем в
-                             //!< мировых координатах
-  vec3d helm_up = vec3d(0.0, 1.0,
-      0.0);  //!< Вектор указывает куда смотрит верх шлема в мировых координатах
-  std::mutex helm_axis_lock;
 
   double right_velo_;  //!< Скорость "дрейфа" шлема вправо (из калибровки)
   double top_velo_;  //!< Скорость "дрейфа" шлема вверх (из калибровки)
@@ -63,11 +53,7 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
                        //!< калибровки)
   std::mutex velo_lock_;
 
-  /*! Есть три направления в мировых координатах: вперёд, направо и вверх
-  относительно шлема Эту систему координат нужно повернуть на заданные углы
-  относительно самих себя */
-  void RotateAxis(vec3d& forward, vec3d& up, double right_angle,
-      double top_angle, double clock_angle);
+  Rotation rotation_;  //!< Математика для расчёта вращений
 };
 
 

@@ -79,7 +79,7 @@ class GlProgramm: public Transformer {
     // Вход-Выход
     GLuint input_texture;  // Номер текстуры входного изображения
     int width, height, align_width;  // Размеры входной текстуры
-    double right_angle, top_angle, roll_angle;  // Поворот шлема
+    glm::mat4 rotation_matrix;  // Матрица поворота
     FrameBuffer left_scene,
         right_scene;  // Кадровые буфера с выходными изображениями
 
@@ -323,10 +323,9 @@ void GlProgramm::Processing() {
     lk.unlock();
 
     if (helmet_) {
-      helmet_->GetViewPoint(
-          params.right_angle, params.top_angle, params.roll_angle);
+      helmet_->GetViewPoint(params.rotation_matrix);
     } else {
-      params.right_angle = params.top_angle = params.roll_angle = 0.0;
+      params.rotation_matrix = glm::mat4(1);
     }
 
     // Вытащим все пришедшие кадры, их может и не быть (ложное слетание с wait)
@@ -611,16 +610,7 @@ void GlProgramm::SchemeLeftRight180(const SceneParameters& params) {
         params.width, params.align_width);
   }
 
-  // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
-  // в горизонтальной плоскости (right_angle)
-  glm::mat4 r1 = glm::rotate(
-      glm::mat4(1.0f), (float)params.roll_angle, glm::vec3(0.0f, 0.0f, 1.0f));
-  glm::mat4 r2 =
-      glm::rotate(r1, float(params.top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
-  glm::mat4 r3 =
-      glm::rotate(r2, float(params.right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-  auto transform = projection_matrix_ * r3;
+  auto transform = projection_matrix_ * params.rotation_matrix;
 
   HalfCilinder(params.left_eye, params.left_scene, transform);
   HalfCilinder(params.right_eye, params.right_scene, transform);
@@ -640,16 +630,7 @@ void GlProgramm::SchemeFlat3D(const GlProgramm::SceneParameters& params) {
         params.width, params.align_width);
   }
 
-  // Последовательность поворотов: кручение (roll_angle), подъём (top_angle),
-  // в горизонтальной плоскости (right_angle)
-  glm::mat4 r1 = glm::rotate(
-      glm::mat4(1.0f), (float)params.roll_angle, glm::vec3(0.0f, 0.0f, 1.0f));
-  glm::mat4 r2 =
-      glm::rotate(r1, float(params.top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
-  glm::mat4 r3 =
-      glm::rotate(r2, float(params.right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-  auto transform = projection_matrix_ * r3;
+  auto transform = projection_matrix_ * params.rotation_matrix;
 
   auto w2h = double(params.width) / double(params.height);
 

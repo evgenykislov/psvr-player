@@ -22,6 +22,8 @@
 
 #include <memory>
 
+#include <glm/glm.hpp>
+
 class IHelmet {
  public:
   virtual ~IHelmet() {}
@@ -34,8 +36,7 @@ class IHelmet {
   virtual void SetVRMode(VRMode mode) = 0;
   virtual void CenterView() = 0;
   // TODO ?? description
-  virtual void GetViewPoint(
-      double& right_angle, double& top_angle, double& clock_angle) = 0;
+  virtual void GetViewPoint(glm::mat4& rotation) = 0;
 };
 
 std::shared_ptr<IHelmet> CreateHelmetView();
