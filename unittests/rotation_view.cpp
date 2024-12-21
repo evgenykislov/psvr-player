@@ -51,7 +51,7 @@ void GenerateRotation(track& newtrack) {
 
 
 /*! Сосчитаем угол поворота между векторами в заданной плоскости. Поворот
-считается против часовой стрелки с точки зрения вектора нормали. Система
+считается по часовой стрелки с точки зрения вектора нормали. Система
 координат: х - вправо, y - вверх, z - вперёд от нас \param n плоскость, в
 которой считаются углы. Задаётся нормалью \param v1 вектор от которого считается
 поворот \param v2 вектор в сторону которого считается поворот \return угол
@@ -178,12 +178,12 @@ TEST(HorizontView, Mathematics) {
 }
 
 
-TEST(TopDownView, Mathematics) {
+TEST(DownTopView, Mathematics) {
   track t;
   t.clear();
   const float dangle = 90;
 
-  for (float angle = -90; angle < 90; angle += dangle) {
+  for (float angle = -80; angle < 90; angle += dangle) {
     Point p;
     p.Helmet.x = 0.0;
     p.Helmet.y = sin(glm::radians(angle));
