@@ -5,7 +5,14 @@ project(unittests)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(SOURCE_FILES "rotation_view.cpp")
+set(SOURCE_FILES
+  "rotation_view.cpp"
+  "../psvrplayer/rotation.cpp"
+)
+
+set(HEADER_FILES
+  "../psvrplayer/rotation.h"
+)
 
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
