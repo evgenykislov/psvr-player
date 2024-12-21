@@ -14,13 +14,13 @@
 using vec3d = glm::vec<3, double, glm::defaultp>;
 
 struct Point {
-  glm::vec3 Helmet;  // Direction of helmet view
-  glm::vec3 Tip;     // Direction of up-side of helment. Length is 1.0
+  vec3d Helmet;  // Direction of helmet view
+  vec3d Tip;     // Direction of up-side of helment. Length is 1.0
 };
 
 using track = std::vector<Point>;
 
-const double kSuitableNearZeroLength = 1.0e-4;
+const double kSuitableNearZeroLength = 1.0e-6;
 
 /*
 void GenerateRotation(track& newtrack) {
@@ -81,10 +81,7 @@ double Distance(glm::vec3 a, glm::vec3 b) {
   return glm::length(c);
 }
 
-
-TEST(LeftRightView, Mathematics) {
-  track t;
-  GenerateLeftRight(t);
+void CheckTrack(const track& t) {
   EXPECT_GE(t.size(), 2);
 
   auto base = t[0];
@@ -108,6 +105,13 @@ TEST(LeftRightView, Mathematics) {
     EXPECT_LE(Distance(view, base.Helmet), kSuitableNearZeroLength);
     EXPECT_LE(Distance(tip, base.Tip), kSuitableNearZeroLength);
   }
+}
+
+
+TEST(LeftRightView, Mathematics) {
+  track t;
+  GenerateLeftRight(t);
+  CheckTrack(t);
 }
 
 /*
