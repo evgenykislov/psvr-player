@@ -19,7 +19,7 @@ find_package(Threads REQUIRED)
 
 include_directories(${GTEST_INCLUDE_DIR})
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${HEADER_FILES} ${SOURCE_FILES})
 
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARY} ${GTEST_MAIN_LIBRARY})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)

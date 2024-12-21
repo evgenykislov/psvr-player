@@ -89,11 +89,16 @@ void GetAngles(Point p1, Point p2, double& right_angle, double& top_angle,
   clock_angle = Angle(p1.Helmet, p1.Tip, p2.Tip);
 }
 
+
+/*! Считает расстояние между двумя векторами. Фактически это длина вектора
+ * разности */
 double Distance(glm::vec3 a, glm::vec3 b) {
   auto c = a - b;
   return glm::length(c);
 }
 
+
+/*! Проверяет трек точек на правильность расчёта */
 void CheckTrack(const track& t) {
   EXPECT_GE(t.size(), 2);
 
@@ -138,12 +143,47 @@ TEST(LeftRightView, Mathematics) {
 }
 
 
+TEST(RightLeftView, Mathematics) {
+  track t;
+  t.clear();
+  const float dangle = 0.1;
+
+  for (float angle = 90; angle > -90; angle -= dangle) {
+    Point p;
+    p.Helmet.x = cos(glm::radians(angle));
+    p.Helmet.y = 0.0;
+    p.Helmet.z = sin(glm::radians(angle));
+    p.Tip = glm::vec3(0.0, 1.0, 0.0);
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
+TEST(HorizontView, Mathematics) {
+  track t;
+  t.clear();
+  const float dangle = 0.1;
+  float angle = 0.0;
+
+  for (int i = 0; i < 7200; ++i, angle += dangle) {
+    Point p;
+    p.Helmet.x = cos(glm::radians(angle));
+    p.Helmet.y = 0.0;
+    p.Helmet.z = sin(glm::radians(angle));
+    p.Tip = glm::vec3(0.0, 1.0, 0.0);
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
 TEST(TopDownView, Mathematics) {
   track t;
   t.clear();
   const float dangle = 90;
 
-  for (float angle = -80; angle < 80; angle += dangle) {
+  for (float angle = -90; angle < 90; angle += dangle) {
     Point p;
     p.Helmet.x = 0.0;
     p.Helmet.y = sin(glm::radians(angle));
