@@ -85,7 +85,7 @@ void GetAngles(Point p1, Point p2, double& right_angle, double& top_angle,
     double& clock_angle) {
   right_angle = Angle(p1.Tip, p1.Helmet, p2.Helmet);
   auto top_axis = glm::normalize(glm::cross(p1.Tip, p1.Helmet));
-  top_angle = Angle(top_axis, p1.Helmet, p2.Helmet);
+  top_angle = -Angle(top_axis, p1.Helmet, p2.Helmet);
   clock_angle = Angle(p1.Helmet, p1.Tip, p2.Tip);
 }
 
@@ -126,16 +126,16 @@ void CheckTrack(const track& t) {
 }
 
 
-TEST(LeftRightView, Mathematics) {
+TEST(RightView, Mathematics) {
   track t;
   t.clear();
   const float dangle = 0.1;
 
-  for (float angle = -90; angle < 90; angle += dangle) {
+  for (float angle = 0; angle < 90; angle += dangle) {
     Point p;
-    p.Helmet.x = cos(glm::radians(angle));
+    p.Helmet.x = sin(glm::radians(angle));
     p.Helmet.y = 0.0;
-    p.Helmet.z = sin(glm::radians(angle));
+    p.Helmet.z = cos(glm::radians(angle));
     p.Tip = glm::vec3(0.0, 1.0, 0.0);
     t.push_back(p);
   }
@@ -143,16 +143,16 @@ TEST(LeftRightView, Mathematics) {
 }
 
 
-TEST(RightLeftView, Mathematics) {
+TEST(LeftView, Mathematics) {
   track t;
   t.clear();
   const float dangle = 0.1;
 
-  for (float angle = 90; angle > -90; angle -= dangle) {
+  for (float angle = 0; angle > -90; angle -= dangle) {
     Point p;
-    p.Helmet.x = cos(glm::radians(angle));
+    p.Helmet.x = sin(glm::radians(angle));
     p.Helmet.y = 0.0;
-    p.Helmet.z = sin(glm::radians(angle));
+    p.Helmet.z = cos(glm::radians(angle));
     p.Tip = glm::vec3(0.0, 1.0, 0.0);
     t.push_back(p);
   }
@@ -160,30 +160,12 @@ TEST(RightLeftView, Mathematics) {
 }
 
 
-TEST(HorizontView, Mathematics) {
+TEST(TopView, Mathematics) {
   track t;
   t.clear();
-  const float dangle = 0.1;
-  float angle = 0.0;
+  const float dangle = 10;
 
-  for (int i = 0; i < 7200; ++i, angle += dangle) {
-    Point p;
-    p.Helmet.x = cos(glm::radians(angle));
-    p.Helmet.y = 0.0;
-    p.Helmet.z = sin(glm::radians(angle));
-    p.Tip = glm::vec3(0.0, 1.0, 0.0);
-    t.push_back(p);
-  }
-  CheckTrack(t);
-}
-
-
-TEST(DownTopView, Mathematics) {
-  track t;
-  t.clear();
-  const float dangle = 90;
-
-  for (float angle = -80; angle < 90; angle += dangle) {
+  for (float angle = 0; angle < 85; angle += dangle) {
     Point p;
     p.Helmet.x = 0.0;
     p.Helmet.y = sin(glm::radians(angle));
