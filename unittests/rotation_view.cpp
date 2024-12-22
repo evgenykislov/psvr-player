@@ -163,7 +163,7 @@ TEST(LeftView, Mathematics) {
 TEST(TopView, Mathematics) {
   track t;
   t.clear();
-  const float dangle = 10;
+  const float dangle = 0.1;
 
   for (float angle = 0; angle < 85; angle += dangle) {
     Point p;
@@ -173,6 +173,63 @@ TEST(TopView, Mathematics) {
     p.Tip.x = 0.0;
     p.Tip.y = cos(glm::radians(angle));
     p.Tip.z = -sin(glm::radians(angle));
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
+TEST(DownView, Mathematics) {
+  track t;
+  t.clear();
+  const float dangle = 0.1;
+
+  for (float angle = 0; angle > -85; angle -= dangle) {
+    Point p;
+    p.Helmet.x = 0.0;
+    p.Helmet.y = sin(glm::radians(angle));
+    p.Helmet.z = cos(glm::radians(angle));
+    p.Tip.x = 0.0;
+    p.Tip.y = cos(glm::radians(angle));
+    p.Tip.z = -sin(glm::radians(angle));
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
+TEST(ClockView, Mathematics) {
+  track t;
+  t.clear();
+  const float dangle = 0.1;
+
+  for (float angle = 0; angle < 180; angle += dangle) {
+    Point p;
+    p.Helmet.x = 0.0;
+    p.Helmet.y = 0.0;
+    p.Helmet.z = 1.0;
+    p.Tip.x = sin(glm::radians(angle));
+    p.Tip.y = cos(glm::radians(angle));
+    p.Tip.z = 0.0;
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
+TEST(CClockView, Mathematics) {
+  track t;
+  t.clear();
+  const float dangle = 0.1;
+
+  for (float angle = 0; angle > -180; angle -= dangle) {
+    Point p;
+    p.Helmet.x = 0.0;
+    p.Helmet.y = 0.0;
+    p.Helmet.z = 1.0;
+    p.Tip.x = sin(glm::radians(angle));
+    p.Tip.y = cos(glm::radians(angle));
+    p.Tip.z = 0.0;
     t.push_back(p);
   }
   CheckTrack(t);
