@@ -35,6 +35,8 @@ void Rotation::GetSummRotation(glm::mat4& rot_mat) {
   double right_angle = 0.0;
   double top_angle = 0.0;
 
+  std::lock_guard<std::mutex> l(data_lock_);
+
   // Отработаем случай, когда взгляд идёт ровно вверх или ровно вниз
   vec3d zenith(0.0, 1.0, 0.0);
   auto top_dev = glm::cross(view_, vec3d(0.0, 1.0, 0.0));
@@ -54,7 +56,6 @@ void Rotation::GetSummRotation(glm::mat4& rot_mat) {
   } else {
     right_angle = atan2(view_.x, view_.z);
     top_angle = asin(view_.y);
-
     clock_angle = RadAngle(view_, tip_, zenith);
   }
 
