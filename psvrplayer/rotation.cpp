@@ -1,6 +1,15 @@
 #include "rotation.h"
 
 
+#define DEBUG_OUTPUT
+
+
+#ifdef DEBUG_OUTPUT
+#include <iostream>
+#include <glm/gtx/string_cast.hpp>
+#endif
+
+
 const double kPi = 3.1415926535897932384626433832795;
 const double kNearZeroLength =
     1.0e-4;  //!< Длина очень короткого вектора. При расчётах углов означает
@@ -27,6 +36,13 @@ void Rotation::Rotate(double right1, double top1, double clock1) {
 
   view_ = glm::normalize(fv2);
   tip_ = glm::normalize(uv2);
+
+#ifdef DEBUG_OUTPUT
+  std::cout << "Rotation: apply " << right1 << ", " << top1 << ", " << clock1
+            << std::endl;
+  std::cout << "  result: view " << glm::to_string(view_) << ", tip "
+            << glm::to_string(tip_) << std::endl;
+#endif
 }
 
 

@@ -22,33 +22,6 @@ using track = std::vector<Point>;
 
 const double kSuitableNearZeroLength = 1.0e-6;
 
-/*
-void GenerateRotation(track& newtrack) {
-  const float dangle = 90.0;
-  glm::vec3 polar(0.0, -1.0, 10.0);
-  glm::mat4 rot(1);
-  rot = glm::rotate(rot, dangle, glm::normalize(glm::vec3(0.0, 1.0, 1.0)));
-
-  newtrack.clear();
-  glm::vec3 dir(0.0, 0.0, 1.0);
-  for (double angle = 0.0; angle < 360; angle += dangle) {
-    // proc
-    auto n1 = glm::cross(dir, polar);
-    n1 = glm::normalize(n1);
-    auto tip = glm::cross(dir, n1);
-    tip = glm::normalize(tip);
-
-    Point p;
-    p.Helmet = dir;
-    p.Tip = tip;
-
-    newtrack.push_back(p);
-
-    dir = glm::vec3(rot * glm::vec4(dir, 1.0));
-  }
-}
-*/
-
 
 /*! Сосчитаем угол поворота между векторами в заданной плоскости. Поворот
 считается по часовой стрелки с точки зрения вектора нормали. Система
@@ -84,9 +57,11 @@ double Angle(const vec3d& n, const vec3d& v1, const vec3d& v2) {
 void GetAngles(Point p1, Point p2, double& right_angle, double& top_angle,
     double& clock_angle) {
   right_angle = Angle(p1.Tip, p1.Helmet, p2.Helmet);
-  auto top_axis = glm::normalize(glm::cross(p1.Tip, p1.Helmet));
-  top_angle = -Angle(top_axis, p1.Helmet, p2.Helmet);
-  clock_angle = Angle(p1.Helmet, p1.Tip, p2.Tip);
+  auto p1_helmet_right =
+      glm::rotate(p1.Helmet, glm::radians(right_angle), p1.Tip);
+  auto top_axis = glm::normalize(glm::cross(p1.Tip, p1_helmet_right));
+  top_angle = -Angle(top_axis, p1_helmet_right, p2.Helmet);
+  clock_angle = Angle(p1_helmet_right, p1.Tip, p2.Tip);
 }
 
 
@@ -109,6 +84,13 @@ void CheckTrack(const track& t) {
     double r, t, c;
     GetAngles(*(it - 1), *it, r, t, c);
 
+    std::cout << "-----------" << std::endl;
+    std::cout << "Prev view " << glm::to_string((it - 1)->Helmet) << ", tip "
+              << glm::to_string((it - 1)->Tip) << std::endl;
+    std::cout << "Cur view " << glm::to_string((it)->Helmet) << ", tip "
+              << glm::to_string((it)->Tip) << std::endl;
+
+
     rt.Rotate(r, t, c);
 
     glm::mat4 m;
@@ -117,8 +99,8 @@ void CheckTrack(const track& t) {
     auto view = m * glm::vec4(base.Helmet, 1.0);
     auto tip = m * glm::vec4(base.Tip, 1.0);
 
-    //    std::cout << "Distance: " << Distance(view, it->Helmet) << ", " <<
-    //    Distance(tip, it->Tip) << std::endl;
+    std::cout << "Distance: " << Distance(view, it->Helmet) << ", "
+              << Distance(tip, it->Tip) << std::endl;
 
     EXPECT_LE(Distance(view, it->Helmet), kSuitableNearZeroLength);
     EXPECT_LE(Distance(tip, it->Tip), kSuitableNearZeroLength);
@@ -235,11 +217,38 @@ TEST(CClockView, Mathematics) {
   CheckTrack(t);
 }
 
-/*
-TEST(RotationView, Mathematics) {
-  track t;
-  GenerateRotation(t);
 
-  EXPECT_FALSE(t.empty());
+TEST(UpCircleRightView, Mathematics) {
+  const float dangle = 45;
+
+  // Матрица поворота
+  glm::mat4 rot(1);
+  rot = glm::rotate(
+      rot, glm::radians(dangle), glm::normalize(glm::vec3(0.0, 0.5, 1.0)));
+
+  track t;
+  t.clear();
+  glm::vec3 dir(0.0, 0.0, 1.0);
+  glm::vec3 zenith(0.0, 1.0, 0.0);
+  for (double angle = 0.0; angle < 170; angle += dangle) {
+    // Найдём вектор вершины, который смотрит вверх (с учётом наклонов)
+    auto n1 = glm::cross(zenith, dir);
+    n1 = glm::normalize(n1);
+    auto tip = glm::cross(dir, n1);
+    tip = glm::normalize(tip);
+
+    Point p;
+    p.Helmet = dir;
+    p.Tip = tip;
+
+    std::cout << "UpCircle point: view: " << glm::to_string(dir)
+              << ", tip: " << glm::to_string(tip) << std::endl;
+    t.push_back(p);
+
+    // Повернём вектор взгляда
+    dir = glm::vec3(rot * glm::vec4(dir, 1.0));
+  }
+
+
+  CheckTrack(t);
 }
-*/
