@@ -28,11 +28,11 @@ void Rotation::Rotate(double right1, double top1, double clock1) {
   std::lock_guard<std::mutex> l(data_lock_);
   auto right = -glm::cross(view_, tip_);
   auto fv1 = glm::rotate(view_, glm::radians(right1), tip_);
-  //  auto rv1 = glm::rotate(right, glm::radians(right1), tip_);
-  auto fv2 = glm::rotate(fv1, glm::radians(-top1), right);
-  auto uv1 = glm::rotate(tip_, glm::radians(-top1), right);
-  //  auto rv2 = glm::rotate(rv1, glm::radians(-clock1), view_);
-  auto uv2 = glm::rotate(uv1, glm::radians(-clock1), view_);
+  auto rv1 = glm::rotate(right, glm::radians(right1), tip_);
+  auto fv2 = glm::rotate(fv1, glm::radians(-top1), rv1);
+  auto uv1 = glm::rotate(tip_, glm::radians(-top1), rv1);
+  //  auto rv2 = glm::rotate(rv1, glm::radians(-clock1), fv2);
+  auto uv2 = glm::rotate(uv1, glm::radians(-clock1), fv2);
 
   view_ = glm::normalize(fv2);
   tip_ = glm::normalize(uv2);
@@ -42,48 +42,29 @@ void Rotation::Rotate(double right1, double top1, double clock1) {
             << std::endl;
   std::cout << "  result: view " << glm::to_string(view_) << ", tip "
             << glm::to_string(tip_) << std::endl;
+  std::cout << "  view-tip angle: "
+            << glm::degrees(glm::acos(glm::dot(view_, tip_))) << std::endl;
+
 #endif
 }
 
 
 void Rotation::GetSummRotation(glm::mat4& rot_mat) {
-  double clock_angle = 0.0;
-  double right_angle = 0.0;
-  double top_angle = 0.0;
-
   std::lock_guard<std::mutex> l(data_lock_);
 
-  // Отработаем случай, когда взгляд идёт ровно вверх или ровно вниз
-  vec3d zenith(0.0, 1.0, 0.0);
-  auto top_dev = glm::cross(view_, vec3d(0.0, 1.0, 0.0));
-  if (glm::length(top_dev) < kNearZeroLength) {
-    // Взгляд ровно верх или вниз
-    clock_angle = 0.0;  // Считаем, что шлем не наклонён
-    if (view_.y > 0.0) {
-      // Смотрим ровно вверх
-      // Горизонтальный угол считаем как противоположный для вершины
-      right_angle = atan2(-tip_.x, -tip_.z);
-      top_angle = kPi / 2.0;
-    } else {
-      // Смотрим ровно вниз
-      right_angle = atan2(tip_.x, tip_.z);
-      top_angle = -kPi / 2.0;
-    }
-  } else {
-    right_angle = atan2(view_.x, view_.z);
-    top_angle = asin(view_.y);
-    clock_angle = RadAngle(view_, tip_, zenith);
-  }
+  vec3d base_view(0.0, 0.0, 1.0);
+  vec3d base_tip(0.0, 1.0, 0.0);
+  glm::dmat4 m(1);
 
-  // Последовательность (обратная) поворотов: кручение (roll_angle), подъём
-  // (top_angle), в горизонтальной плоскости (right_angle)
-  glm::mat4 r1 = glm::rotate(
-      glm::mat4(1.0f), float(clock_angle), glm::vec3(0.0f, 0.0f, 1.0f));
-  glm::mat4 r2 =
-      glm::rotate(r1, float(top_angle), glm::vec3(-1.0f, 0.0f, 0.0f));
-  glm::mat4 r3 =
-      glm::rotate(r2, float(right_angle), glm::vec3(0.0f, 1.0f, 0.0f));
-  rot_mat = r3;
+  auto view_axis = glm::cross(base_view, view_);
+  auto base_angle = RadAngle(view_axis, base_view, view_);
+  auto fix_base_tip = glm::rotate(base_tip, base_angle, view_axis);
+  auto tip_axis = glm::cross(fix_base_tip, tip_);
+  auto tip_angle = RadAngle(tip_axis, fix_base_tip, tip_);
+  m = glm::rotate(m, tip_angle, tip_axis);
+  m = glm::rotate(m, base_angle, view_axis);
+
+  rot_mat = m;
 }
 
 

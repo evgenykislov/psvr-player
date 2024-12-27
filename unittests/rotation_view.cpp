@@ -61,7 +61,7 @@ void GetAngles(Point p1, Point p2, double& right_angle, double& top_angle,
       glm::rotate(p1.Helmet, glm::radians(right_angle), p1.Tip);
   auto top_axis = glm::normalize(glm::cross(p1.Tip, p1_helmet_right));
   top_angle = -Angle(top_axis, p1_helmet_right, p2.Helmet);
-  clock_angle = Angle(p1_helmet_right, p1.Tip, p2.Tip);
+  clock_angle = -Angle(p1_helmet_right, p1.Tip, p2.Tip);
 }
 
 
@@ -98,6 +98,9 @@ void CheckTrack(const track& t) {
 
     auto view = m * glm::vec4(base.Helmet, 1.0);
     auto tip = m * glm::vec4(base.Tip, 1.0);
+
+    std::cout << "Result after rotation matrix. View: " << glm::to_string(view)
+              << ", tip: " << glm::to_string(tip) << std::endl;
 
     std::cout << "Distance: " << Distance(view, it->Helmet) << ", "
               << Distance(tip, it->Tip) << std::endl;
@@ -218,7 +221,44 @@ TEST(CClockView, Mathematics) {
 }
 
 
-TEST(UpCircleRightView, Mathematics) {
+TEST(TopRightClockView, Mathematics) {
+  /* 1 шаг точно вверх, 1 шаг точно вбок, 1 шаг наклона вправо. Повторить
+   * сколько-то раз */
+  track t;
+  t.clear();
+  const float dangle = 15;
+
+  // Исходная точка
+  Point p;
+  p.Helmet.x = 0.0;
+  p.Helmet.y = 0.0;
+  p.Helmet.z = 1.0;
+  p.Tip.x = 0.0;
+  p.Tip.y = 1.0;
+  p.Tip.z = 0.0;
+  t.push_back(p);
+
+  for (int i = 0; i < 3; ++i) {
+    auto right = glm::cross(p.Tip, p.Helmet);
+    // Вверх
+    p.Helmet = glm::rotate(p.Helmet, double(glm::radians(-dangle)), right);
+    p.Tip = glm::rotate(p.Tip, double(glm::radians(-dangle)), right);
+    t.push_back(p);
+    // Вбок
+    p.Helmet = glm::rotate(p.Helmet, double(glm::radians(dangle)), p.Tip);
+    right = glm::rotate(right, double(glm::radians(dangle)), p.Tip);
+    t.push_back(p);
+    // Наклон
+    p.Tip = glm::rotate(p.Tip, double(glm::radians(dangle)), p.Helmet);
+    right = glm::rotate(right, double(glm::radians(dangle)), p.Helmet);
+    t.push_back(p);
+  }
+
+  CheckTrack(t);
+}
+
+
+TEST(UppCircleRightView, Mathematics) {
   const float dangle = 45;
 
   // Матрица поворота
@@ -240,9 +280,6 @@ TEST(UpCircleRightView, Mathematics) {
     Point p;
     p.Helmet = dir;
     p.Tip = tip;
-
-    std::cout << "UpCircle point: view: " << glm::to_string(dir)
-              << ", tip: " << glm::to_string(tip) << std::endl;
     t.push_back(p);
 
     // Повернём вектор взгляда
