@@ -84,12 +84,12 @@ void CheckTrack(const track& t) {
     double r, t, c;
     GetAngles(*(it - 1), *it, r, t, c);
 
-    std::cout << "-----------" << std::endl;
-    std::cout << "Prev view " << glm::to_string((it - 1)->Helmet) << ", tip "
-              << glm::to_string((it - 1)->Tip) << std::endl;
-    std::cout << "Cur view " << glm::to_string((it)->Helmet) << ", tip "
-              << glm::to_string((it)->Tip) << std::endl;
-
+    //    std::cout << "-----------" << std::endl;
+    //    std::cout << "Prev view " << glm::to_string((it - 1)->Helmet) << ",
+    //    tip "
+    //              << glm::to_string((it - 1)->Tip) << std::endl;
+    //    std::cout << "Cur view " << glm::to_string((it)->Helmet) << ", tip "
+    //              << glm::to_string((it)->Tip) << std::endl;
 
     rt.Rotate(r, t, c);
 
@@ -99,11 +99,12 @@ void CheckTrack(const track& t) {
     auto view = m * glm::vec4(base.Helmet, 1.0);
     auto tip = m * glm::vec4(base.Tip, 1.0);
 
-    std::cout << "Result after rotation matrix. View: " << glm::to_string(view)
-              << ", tip: " << glm::to_string(tip) << std::endl;
+    //    std::cout << "Result after rotation matrix. View: " <<
+    //    glm::to_string(view)
+    //              << ", tip: " << glm::to_string(tip) << std::endl;
 
-    std::cout << "Distance: " << Distance(view, it->Helmet) << ", "
-              << Distance(tip, it->Tip) << std::endl;
+    //    std::cout << "Distance: " << Distance(view, it->Helmet) << ", "
+    //              << Distance(tip, it->Tip) << std::endl;
 
     EXPECT_LE(Distance(view, it->Helmet), kSuitableNearZeroLength);
     EXPECT_LE(Distance(tip, it->Tip), kSuitableNearZeroLength);

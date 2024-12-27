@@ -11,10 +11,6 @@
 
 
 const double kPi = 3.1415926535897932384626433832795;
-const double kNearZeroLength =
-    1.0e-4;  //!< Длина очень короткого вектора. При расчётах углов означает
-             //!< взгляд ровно вверх или вниз
-
 
 Rotation::Rotation() { Reset(); }
 
@@ -36,16 +32,6 @@ void Rotation::Rotate(double right1, double top1, double clock1) {
 
   view_ = glm::normalize(fv2);
   tip_ = glm::normalize(uv2);
-
-#ifdef DEBUG_OUTPUT
-  std::cout << "Rotation: apply " << right1 << ", " << top1 << ", " << clock1
-            << std::endl;
-  std::cout << "  result: view " << glm::to_string(view_) << ", tip "
-            << glm::to_string(tip_) << std::endl;
-  std::cout << "  view-tip angle: "
-            << glm::degrees(glm::acos(glm::dot(view_, tip_))) << std::endl;
-
-#endif
 }
 
 
