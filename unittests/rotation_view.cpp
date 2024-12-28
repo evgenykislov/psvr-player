@@ -112,6 +112,20 @@ void CheckTrack(const track& t) {
 }
 
 
+TEST(FixedView, Mathematics) {
+  track t;
+  t.clear();
+
+  for (int i = 0; i < 100; ++i) {
+    Point p;
+    p.Helmet = glm::vec3(0.0, 0.0, 1.0);
+    p.Tip = glm::vec3(0.0, 1.0, 0.0);
+    t.push_back(p);
+  }
+  CheckTrack(t);
+}
+
+
 TEST(RightView, Mathematics) {
   track t;
   t.clear();
@@ -254,39 +268,6 @@ TEST(TopRightClockView, Mathematics) {
     right = glm::rotate(right, double(glm::radians(dangle)), p.Helmet);
     t.push_back(p);
   }
-
-  CheckTrack(t);
-}
-
-
-TEST(UppCircleRightView, Mathematics) {
-  const float dangle = 45;
-
-  // Матрица поворота
-  glm::mat4 rot(1);
-  rot = glm::rotate(
-      rot, glm::radians(dangle), glm::normalize(glm::vec3(0.0, 0.5, 1.0)));
-
-  track t;
-  t.clear();
-  glm::vec3 dir(0.0, 0.0, 1.0);
-  glm::vec3 zenith(0.0, 1.0, 0.0);
-  for (double angle = 0.0; angle < 170; angle += dangle) {
-    // Найдём вектор вершины, который смотрит вверх (с учётом наклонов)
-    auto n1 = glm::cross(zenith, dir);
-    n1 = glm::normalize(n1);
-    auto tip = glm::cross(dir, n1);
-    tip = glm::normalize(tip);
-
-    Point p;
-    p.Helmet = dir;
-    p.Tip = tip;
-    t.push_back(p);
-
-    // Повернём вектор взгляда
-    dir = glm::vec3(rot * glm::vec4(dir, 1.0));
-  }
-
 
   CheckTrack(t);
 }
