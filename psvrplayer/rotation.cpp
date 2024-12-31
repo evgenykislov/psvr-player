@@ -1,10 +1,12 @@
 #include "rotation.h"
 
+#ifndef NDEBUG
+// #define DEBUG_POSITIONS
+// #define DEBUG_ANGLES
+#endif
 
-#define DEBUG_OUTPUT
 
-
-#ifdef DEBUG_OUTPUT
+#if defined(DEBUG_ANGLES) || defined(DEBUG_POSITIONS)
 #include <iostream>
 #include <glm/gtx/string_cast.hpp>
 #endif
@@ -33,6 +35,44 @@ void Rotation::Rotate(double right1, double top1, double clock1) {
 
   view_ = glm::normalize(fv2);
   tip_ = glm::normalize(uv2);
+
+#ifdef DEBUG_POSITIONS
+  const size_t kPositionInterval = 1000;
+  static size_t counter = 0;
+  ++counter;
+  if (counter >= kPositionInterval) {
+    vec3d zenith(0.0, 1.0, 0.0);
+    std::cout << "Horizon: " << 90.0 - glm::degrees(glm::angle(zenith, view_))
+              << " degr" << std::endl;
+    std::cout << "  Upper ? Zenith: " << glm::degrees(glm::angle(zenith, tip_))
+              << " degr" << std::endl;
+    counter = 0;
+  }
+#endif
+
+#ifdef DEBUG_ANGLES
+
+  const size_t kSummInterval = 5000;
+
+  static double summ_right = 0;
+  static double summ_top = 0;
+  static double summ_clock = 0;
+  static size_t summ_counter = 0;
+
+  summ_right += right1;
+  summ_top += top1;
+  summ_clock += clock1;
+
+  // Логирование
+  ++summ_counter;
+  if (summ_counter >= kSummInterval) {
+    std::cout << "{" << summ_right << ";" << summ_top << ";" << summ_clock
+              << "};" << std::endl;
+    summ_right = summ_top = summ_clock = 0.0;
+    summ_counter = 0;
+  }
+
+#endif
 }
 
 
