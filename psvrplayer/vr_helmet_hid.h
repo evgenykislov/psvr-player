@@ -63,6 +63,8 @@ class PsvrHelmetHid {
   \return число из буфера */
   static int16_t read_int16(const unsigned char* buffer, int offset);
 
+  static int32_t read_int32(const unsigned char* buffer, int offset);
+
   bool GetHidNames(std::string& control, std::string& sensors);
 };
 
