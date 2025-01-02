@@ -113,6 +113,14 @@ void PsvrHelmetHid::ReadHid() {
     int16_t top_acc = read_int16(buffer, 22) + read_int16(buffer, 38);
     int16_t roll_acc = read_int16(buffer, 24) + read_int16(buffer, 40);
 
+    static int32_t last_st = std::numeric_limits<int32_t>::min();
+    auto st = read_int32(buffer, 16);
+    if (last_st == std::numeric_limits<int32_t>::min()) {
+      last_st = st;
+    }
+    auto dst = st - last_st;
+    last_st = st;
+
     int64_t ims =
         std::chrono::duration_cast<std::chrono::microseconds>(ct - prev_reading)
             .count();
@@ -133,6 +141,12 @@ int16_t PsvrHelmetHid::read_int16(const unsigned char* buffer, int offset) {
   v = buffer[offset];
   v |= buffer[offset + 1] << 8;
   return v;
+}
+
+
+int32_t PsvrHelmetHid::read_int32(const unsigned char* buffer, int offset) {
+  return (buffer[offset + 0] << 0) | (buffer[offset + 1] << 8) |
+         (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24);
 }
 
 

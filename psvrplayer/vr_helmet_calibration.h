@@ -38,7 +38,7 @@ class PsvrHelmetCalibration: public IHelmet, PsvrHelmetHid {
   // Virtual functions (not used here)
   void SetVRMode(VRMode mode) override{};
   void CenterView() override{};
-  void GetViewPoint(double&, double&, double&) override{};
+  void GetViewPoint(glm::mat4&) override{};
 };
 
 #endif  // PSVRHELMETCALIBRATION_H

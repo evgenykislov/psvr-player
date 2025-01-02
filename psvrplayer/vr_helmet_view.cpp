@@ -19,11 +19,6 @@
 #include "iniparser.h"
 #include "home-dir.h"
 
-
-#define DEBUG_HELMET_VIEW
-
-const double kPi = 3.1415926535897932384626433832795;
-
 const char kConfigFileName[] = "/psvrplayer.cfg";
 
 PsvrHelmetView::PsvrHelmetView() {
@@ -65,54 +60,12 @@ void PsvrHelmetView::OnSensorsData(
   double roll_da = (to_clockwork - clock_velo_) * ims;
   vl.unlock();
 
-  std::unique_lock<std::mutex> lk(helm_axis_lock);
   bool cv = center_view_flag_.exchange(false);
   if (cv) {
-    helm_forward = vec3d(0.0, 0.0, 1.0);
-    helm_up = vec3d(0.0, 1.0, 0.0);
+    rotation_.Reset();
   } else {
-    RotateAxis(helm_forward, helm_up, right_da, top_da, roll_da);
-    auto pv = glm::perp(helm_up, helm_forward);
-    helm_up = pv;
+    rotation_.Rotate(right_da, top_da, roll_da);
   }
-  lk.unlock();
-
-
-#ifdef DEBUG_HELMET_VIEW
-  // Отладочный вывод позиции шлема раз в секунду
-  static auto mark = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-  static size_t counter = 0;
-  ++counter;
-  auto curt = std::chrono::steady_clock::now();
-  if (curt >= mark) {
-    mark = curt + std::chrono::seconds(1);
-
-    double ra, ta, ca;
-    GetViewPoint(ra, ta, ca);
-    std::cout << "Helm angles: right=" << int(ra * 180.0 / kPi)
-              << ", top=" << int(ta * 180.0 / kPi)
-              << ", clockrotation=" << int(ca * 180.0 / kPi)
-              << ". Points per second=" << counter << std::endl;
-    counter = 0;
-  }
-#endif  // DEBUG_HELMET_VIEW
-}
-
-
-void PsvrHelmetView::RotateAxis(PsvrHelmetView::vec3d& forward,
-    PsvrHelmetView::vec3d& up, double right_angle, double top_angle,
-    double clock_angle) {
-  auto right = -glm::cross(forward, up);
-  auto fv1 = glm::rotate(forward, glm::radians(right_angle), up);
-  auto rv1 = glm::rotate(right, glm::radians(right_angle), up);
-  auto fv2 = glm::rotate(fv1, glm::radians(-top_angle), right);
-  auto uv1 = glm::rotate(up, glm::radians(-top_angle), right);
-  auto rv2 = glm::rotate(rv1, glm::radians(-clock_angle), forward);
-  auto uv2 = glm::rotate(uv1, glm::radians(-clock_angle), forward);
-
-  forward = glm::normalize(fv2);
-  right = glm::normalize(rv2);
-  up = glm::normalize(uv2);
 }
 
 
@@ -126,32 +79,11 @@ void PsvrHelmetView::SetVRMode(IHelmet::VRMode mode) {
 
 void PsvrHelmetView::CenterView() { center_view_flag_ = true; }
 
-void PsvrHelmetView::GetViewPoint(
-    double& right_angle, double& top_angle, double& clock_angle) {
-  std::unique_lock<std::mutex> lk(helm_axis_lock);
+void PsvrHelmetView::GetViewPoint(glm::mat4& rot_mat) {
   bool cv = center_view_flag_.exchange(false);
   if (cv) {
-    helm_forward = vec3d(0.0, 0.0, 1.0);
-    helm_up = vec3d(0.0, 1.0, 0.0);
-    right_angle = 0.0;
-    top_angle = 0.0;
-    clock_angle = 0.0;
-    return;
+    rotation_.Reset();
   }
 
-  right_angle = atan2(helm_forward.x, helm_forward.z);
-  if (helm_forward.y >= 1.0) {
-    top_angle = kPi / 2.0;
-  } else if (helm_forward.y <= -1.0) {
-    top_angle = -kPi / 2.0;
-  } else {
-    top_angle = asin(helm_forward.y);
-  }
-
-  auto horz = glm::cross(helm_forward, vec3d(0.0, 1.0, 0.0));
-  if (glm::length2(horz) < kNearZeroLength2) {
-    clock_angle = 0.0;
-  } else {
-    clock_angle = kPi / 2.0 - glm::angle(glm::normalize(horz), helm_up);
-  }
+  rotation_.GetSummRotation(rot_mat);
 }
