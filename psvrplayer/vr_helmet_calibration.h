@@ -2,6 +2,7 @@
 #define PSVRHELMETCALIBRATION_H
 
 #include <mutex>
+#include <string>
 
 #include "vr_helmet.h"
 #include "vr_helmet_hid.h"

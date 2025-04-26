@@ -2,6 +2,7 @@
 #define PSVRHELMETHID_H
 
 #include <atomic>
+#include <string>
 #include <thread>
 
 
