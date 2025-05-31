@@ -100,7 +100,7 @@ std::array<CommandLineParam, 14> CmdParameters = {{
   {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
   {kCmdSwapColor, false, false, kEmptyValue, "--swapcolor", "change color palette"},
   {kCmdSwapLayer, false, false, kEmptyValue, "--swaplayer", "swap left/right view"},
-  {kCmdVersion, false, false, kEmptyValue, "--version", "show version information"},
+  {kCmdVersion, true, false, kEmptyValue, "--version", "show version information"},
   {kCmdVision, false, false, kStringValue, "--vision=", "selects format of 3D movie"},
 }};
 // clang-format on
