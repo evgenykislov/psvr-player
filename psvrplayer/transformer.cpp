@@ -157,13 +157,18 @@ class GlProgramm: public Transformer {
   void SchemeFlat3D(const SceneParameters& params);
 };
 
-Transformer* CreateTransformer(TransformerScheme scheme, StreamsScheme streams,
-    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet) {
+TransformerPtr CreateTransformer(TransformerScheme scheme,
+    StreamsScheme streams, IPlayScreenPtr screen,
+    std::shared_ptr<IHelmet> helmet) {
   try {
-    return new GlProgramm(scheme, streams, screen, helmet);
-  } catch (...) {
+    return std::shared_ptr<Transformer>(
+        new GlProgramm(scheme, streams, screen, helmet));
+  } catch (std::bad_alloc&) {
+    std::cerr << "ERROR: Lack of memory" << std::endl;
+  } catch (std::runtime_error& err) {
+    std::cerr << "ERROR: " << err.what() << std::endl;
   }
-  return nullptr;
+  return std::unique_ptr<Transformer>();
 }
 
 GlProgramm::GlProgramm(TransformerScheme scheme, StreamsScheme streams,

@@ -333,7 +333,6 @@ int DoPlayCommand(std::string fname) {
       return 1;
   }
 
-  // TODO Use shared_ptr instead of raw pointer
   auto trf = CreateTransformer(sch, ss, ps, vr);
   if (!trf) {
     return 1;
@@ -365,14 +364,20 @@ int DoPlayCommand(std::string fname) {
         [vp, vr](int key, int scancode, int action, int mods) {
           KeyProcessor(key, scancode, action, mods, vp, vr);
         });
-    ps->SetMouseEvent([trf](double x_pos, double y_pos) {
-      MouseProcessor(x_pos, y_pos, trf);
-    });
     ps->Run();
+    // Reset filter
+    ps->SetKeyboardFilter({});
   }
 
+  vp->SetDisplayFn({});
+
+  assert(trf.use_count() == 1);
+  trf.reset();  // Удаляем transformer явно, т.к. он держит playscreen
+
+  assert(vp.use_count() == 1);
+  assert(ps.use_count() == 1);
+  // TODO проверка на удаление playscreen или его кэширование
   // TODO Сделать корректное освобождение ресурсов
-  // delete trf;
   return 0;
 }
 
