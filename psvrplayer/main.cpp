@@ -369,8 +369,12 @@ int DoPlayCommand(std::string fname) {
       MouseProcessor(x_pos, y_pos, trf);
     });
     ps->Run();
+    // Reset filter
+    ps->SetKeyboardFilter({});
   }
 
+  assert(vp.use_count() == 1);
+  // TODO проверка на удаление playscreen или его кэширование
   // TODO Сделать корректное освобождение ресурсов
   // delete trf;
   return 0;
