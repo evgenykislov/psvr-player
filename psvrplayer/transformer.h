@@ -41,8 +41,11 @@ class Transformer {
   virtual void SetEyesDistance(int distance) = 0;
 };
 
+using TransformerPtr = std::shared_ptr<Transformer>;
+
 // TODO Сделать shared_ptr
-Transformer* CreateTransformer(TransformerScheme scheme, StreamsScheme streams,
-    IPlayScreenPtr screen, std::shared_ptr<IHelmet> helmet);
+TransformerPtr CreateTransformer(TransformerScheme scheme,
+    StreamsScheme streams, IPlayScreenPtr screen,
+    std::shared_ptr<IHelmet> helmet);
 
 #endif  // TRANSFORMER_H
