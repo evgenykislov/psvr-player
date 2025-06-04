@@ -2,12 +2,13 @@
 
 #include <cassert>
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 
 #include <hidapi/hidapi.h>
 
 
-PsvrHelmetHid::PsvrHelmetHid(): device_1(nullptr), sensors_(nullptr) {
+PsvrHelmetHid::PsvrHelmetHid(): control_(nullptr), sensors_(nullptr) {
   shutdown_flag_ = false;
   sensor_timer_ = 0;
 
@@ -33,7 +34,7 @@ PsvrHelmetHid::~PsvrHelmetHid() {
 
 bool PsvrHelmetHid::OpenDevice() {
   CloseDevice();
-  assert(!device_1);
+  assert(!control_);
   assert(!sensors_);
 
   std::string control;
@@ -43,15 +44,23 @@ bool PsvrHelmetHid::OpenDevice() {
     return false;
   }
 
-  device_1 = hid_open_path(control.c_str());
-  if (!device_1) {
+  control_ = hid_open_path(control.c_str());
+  if (!control_) {
+    auto he = hid_error(nullptr);
+    if (he) {
+      std::wcerr << "Helmet control open error: " << he << std::endl;
+    }
     return false;
   }
 
   sensors_ = hid_open_path(sensors.c_str());
   if (!sensors_) {
-    hid_close((hid_device*)device_1.load());
-    device_1 = nullptr;
+    auto he = hid_error(nullptr);
+    if (he) {
+      std::wcerr << "Helmet sensors open error: " << he << std::endl;
+    }
+    hid_close((hid_device*)control_.load());
+    control_ = nullptr;
     return false;
   }
 
@@ -61,17 +70,24 @@ bool PsvrHelmetHid::OpenDevice() {
 
 void PsvrHelmetHid::CloseDevice() {
   void* d = nullptr;
-  device_1.exchange(d);
+  control_.exchange(d);
   if (d) {
     SplitScreen(false);
     hid_close((hid_device*)d);
-    d = nullptr;
+    auto he = hid_error(nullptr);
+    if (he) {
+      std::wcerr << "Helmet control close error: " << he << std::endl;
+    }
   }
 
+  d = nullptr;
   sensors_.exchange(d);
   if (d) {
     hid_close((hid_device*)d);
-    d = nullptr;
+    auto he = hid_error(nullptr);
+    if (he) {
+      std::wcerr << "Helmet sensors close error: " << he << std::endl;
+    }
   }
 }
 
@@ -189,5 +205,5 @@ bool PsvrHelmetHid::SplitScreen(bool split_mode) {
   buffer_[6] = 0x00;
   buffer_[7] = 0x00;
 
-  return hid_write((hid_device*)device_1.load(), buffer_, 8) != -1;
+  return hid_write((hid_device*)control_.load(), buffer_, 8) != -1;
 }

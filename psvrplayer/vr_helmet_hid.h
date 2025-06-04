@@ -42,7 +42,7 @@ class PsvrHelmetHid {
   const char kPSVRSensorsInterface[4] = ":04";
 
   std::atomic<void*>
-      device_1;  //!< Opened control device with hid_device* type. Or nullptr
+      control_;  //!< Opened control device with hid_device* type. Or nullptr
   std::atomic<void*> sensors_;  //!< Устройство-сенсоры шлема
   uint64_t sensor_timer_;  //!< Часы таймера. Монотонно растут, отсчитывают
                            //!< микросекунды
