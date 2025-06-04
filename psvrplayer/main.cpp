@@ -288,18 +288,17 @@ bool CheckParameters() {
 void PrintHelp() { std::cout << kHelpMessage << std::endl; }
 
 
-/*! Выполнить команду play
+/*! Выполнить команду play - проигрывания файла. При воспроизведении передаётся
+указатель на ранее созданный экземпляр управления шлемом, т.к. закрытие и
+повторное открытие устройства может приводить с ошибкам.
+\param fname имя файла для воспроизведения
+\param vr экземпляр управления шлемом
 \return код возврата. 0 - если нет ошибок */
-int DoPlayCommand(std::string fname) {
-  auto vr = CreateHelmetView();
-  if (!vr) {
-    std::cerr << "PS VR Helmet not found" << std::endl;
-  }
-
-  if (vr) {
+int DoPlayCommand(std::string fname, std::shared_ptr<IHelmet> helmet) {
+  if (helmet) {
     bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
-    vr->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
-                          : IHelmet::VRMode::kSingleScreen);
+    helmet->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
+                              : IHelmet::VRMode::kSingleScreen);
   }
 
   auto ps = CreatePlayScreen(cmd_screen);
@@ -333,7 +332,7 @@ int DoPlayCommand(std::string fname) {
       return 1;
   }
 
-  auto trf = CreateTransformer(sch, ss, ps, vr);
+  auto trf = CreateTransformer(sch, ss, ps, helmet);
   if (!trf) {
     return 1;
   }
@@ -361,8 +360,8 @@ int DoPlayCommand(std::string fname) {
 
   if (ps) {
     ps->SetKeyboardFilter(
-        [vp, vr](int key, int scancode, int action, int mods) {
-          KeyProcessor(key, scancode, action, mods, vp, vr);
+        [vp, helmet](int key, int scancode, int action, int mods) {
+          KeyProcessor(key, scancode, action, mods, vp, helmet);
         });
     ps->Run();
     // Reset filter
@@ -553,12 +552,19 @@ int main(int argc, char** argv) {
     case kCmdPlay: {
       auto l = CmdValues.find(kCmdPlay);
       if (l != CmdValues.end()) {
+        auto vr = CreateHelmetView();
+        if (!vr) {
+          std::cerr << "PS VR Helmet not found" << std::endl;
+        }
+
         for (auto it = l->second.begin(); it != l->second.end(); ++it) {
-          auto r = DoPlayCommand(it->strvalue);
+          auto r = DoPlayCommand(it->strvalue, vr);
           if (res == 0) {
             res = r;
           }
         }
+
+        assert(vr.use_count() < 2);
       }
     } break;
     case kCmdReset:
