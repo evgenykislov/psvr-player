@@ -34,6 +34,7 @@ const char kHelpMessage[] =
     "Options:\n"
     "  --eyes=<distance> - specify eyes distance\n"
     /*    "  --layer=sbs|ou|mono - specify layer configuration\n" */
+    "  --rotation[+][+] - speedup helm rotation\n"
     "  --screen=<position> - specify screen (by position) to play movie\n"
     /* "  --swapcolor - correct color\n" */
     "  --swaplayer - correct order of layers\n"
@@ -59,6 +60,7 @@ enum ParamCmd {
   kCmdListScreens,
   kCmdPlay,
   kCmdReset,
+  kCmdRotationSpeedup,
   kCmdSave,
   kCmdScreen,
   kCmdShow,
@@ -87,7 +89,7 @@ struct CommandLineValue {
 };
 
 // clang-format off
-std::array<CommandLineParam, 14> CmdParameters = {{
+std::array<CommandLineParam, 15> CmdParameters = {{
   {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
   {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
   {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
@@ -95,6 +97,7 @@ std::array<CommandLineParam, 14> CmdParameters = {{
   {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
   {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
   {kCmdReset, true, false, kEmptyValue, "--reset", "reset saved options and calibration"},
+  {kCmdRotationSpeedup, false, false, kStringValue, "--rotation", "rotation speedup"},
   {kCmdSave, true, false, kEmptyValue, "--save", "save current option"},
   {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
   {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
@@ -112,6 +115,7 @@ std::string cmd_screen;
 bool cmd_swap_color = false;
 bool cmd_swap_layer = false;
 int cmd_eyes_distance = 0;
+double cmd_rotation = 1.0;
 
 enum CmdVision {
   kVisionFull,
@@ -281,6 +285,25 @@ bool CheckParameters() {
     }
   }
 
+  l = CmdValues.find(kCmdRotationSpeedup);
+  if (l != CmdValues.end()) {
+    auto v = l->second[0].strvalue;
+    size_t pc = 0;
+    bool wrong = false;
+    for (auto it = v.begin(); it != v.end(); ++it) {
+      if (*it == '+') {
+        ++pc;
+      } else {
+        wrong = true;
+      }
+    }
+    if (wrong || pc > 2) {
+      std::cerr << "Wrong rotation parameter" << std::endl;
+      return false;
+    }
+    cmd_rotation = 1.0 + 0.25 * pc;
+  }
+
   return true;
 }
 
@@ -299,6 +322,7 @@ int DoPlayCommand(std::string fname, std::shared_ptr<IHelmet> helmet) {
     bool vr_mode = (cmd_layer == kLayerSbs) || (cmd_layer == kLayerOu);
     helmet->SetVRMode(vr_mode ? IHelmet::VRMode::kSplitScreen
                               : IHelmet::VRMode::kSingleScreen);
+    helmet->SetRotationSpeedup(cmd_rotation);
   }
 
   auto ps = CreatePlayScreen(cmd_screen);
@@ -515,7 +539,8 @@ int DoCalibration() {
 }
 
 int main(int argc, char** argv) {
-  GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);
+  GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer,
+      &cmd_rotation);
 
   if (!ParseCommandLine(argc, argv)) {
     std::cerr << "--------------------------------------" << std::endl;
@@ -571,8 +596,8 @@ int main(int argc, char** argv) {
       ClearOptions();
       break;
     case kCmdSave:
-      SetOptions(
-          &cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer);
+      SetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
+          &cmd_swap_layer, &cmd_rotation);
       break;
     case kCmdShow: {
       auto l = CmdValues.find(kCmdShow);

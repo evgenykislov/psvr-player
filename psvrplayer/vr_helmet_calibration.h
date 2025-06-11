@@ -37,9 +37,10 @@ class PsvrHelmetCalibration: public IHelmet, PsvrHelmetHid {
   std::string config_fname_;
 
   // Virtual functions (not used here)
-  void SetVRMode(VRMode mode) override{};
+  void SetVRMode(VRMode) override{};
   void CenterView() override{};
   void GetViewPoint(glm::mat4&) override{};
+  void SetRotationSpeedup(double) override{};
 };
 
 #endif  // PSVRHELMETCALIBRATION_H

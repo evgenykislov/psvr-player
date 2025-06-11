@@ -43,7 +43,7 @@ bool CreateConfigFileIfNotExist(bool force_clear) {
 
 
 void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
-    bool* swap_layer) {
+    bool* swap_layer, double* rotation) {
   if (!CreateConfigFileIfNotExist(false)) {
     return;
   }
@@ -71,6 +71,11 @@ void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
       iniparser_set(dict, "Options:swap_layer", *swap_layer ? "1" : "0");
     }
 
+    if (rotation) {
+      std::string pe = std::to_string(*rotation);
+      iniparser_set(dict, "Options:rotation_speedup", pe.c_str());
+    }
+
     auto f = fopen(fname.c_str(), "w+");
     if (!f) {
       std::cerr << "Can't open configuration file '" << fname << "'"
@@ -86,7 +91,7 @@ void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
 }
 
 void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
-    bool* swap_layer) {
+    bool* swap_layer, double* rotation) {
   auto fname = GetConfigFileName();
   auto dict = iniparser_load(fname.c_str());
   if (!dict) {
@@ -122,6 +127,10 @@ void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
     // --- Swap Layer
     if (swap_layer) {
       *swap_layer = iniparser_getint(dict, "Options:swap_layer", 0) != 0;
+    }
+
+    if (rotation) {
+      *rotation = iniparser_getdouble(dict, "Options:rotation_speedup", 1.0);
     }
 
     iniparser_freedict(dict);

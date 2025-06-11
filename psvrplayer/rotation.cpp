@@ -15,7 +15,10 @@
 const double kPi = 3.1415926535897932384626433832795;
 const double kZeroVectorLength2 = 1.0e-25;
 
-Rotation::Rotation() { Reset(); }
+Rotation::Rotation() {
+  Reset();
+  rotation_speedup_ = 1.0;
+}
 
 void Rotation::Reset() {
   std::lock_guard<std::mutex> l(data_lock_);
@@ -103,10 +106,15 @@ void Rotation::GetSummRotation(glm::mat4& rot_mat) {
     m = glm::rotate(m, tip_angle, tip_axis);
   }
   if (base_angle != kZeroAngle) {
-    m = glm::rotate(m, base_angle, view_axis);
+    m = glm::rotate(m, base_angle * rotation_speedup_, view_axis);
   }
 
   rot_mat = m;
+}
+
+void Rotation::SetRotationSpeedup(double speedup) {
+  std::lock_guard<std::mutex> l(data_lock_);
+  rotation_speedup_ = speedup;
 }
 
 
