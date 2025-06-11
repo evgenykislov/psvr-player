@@ -28,6 +28,12 @@ class Rotation {
   \param rot_mat выдаваемая матрица поворота */
   void GetSummRotation(glm::mat4& rot_mat);
 
+  /*! Установить ускоренное/замедленное вращение: поворот шлема на фиксированный
+  угол приводит к кратному увеличению угла. Прим.: поворот набок не ускоряется
+  \param rotation_speed ускорение вращения, в штуках. Значение 1.0 - без
+  ускорения */
+  void SetRotationSpeedup(double speedup);
+
  private:
   Rotation(const Rotation&) = default;
   Rotation(Rotation&&) = default;
@@ -38,6 +44,7 @@ class Rotation {
 
   vec3d view_;  //!< Вектор куда смотрит сам шлем (мировые координаты)
   vec3d tip_;  //!< Вектор куда смотрит верх шлема (мировые координаты)
+  double rotation_speedup_;  //!< Коэффициент ускоренного вращения
   std::mutex data_lock_;
 
   /*! Сосчитаем угол поворота между векторами в заданной плоскости. Поворот

@@ -87,3 +87,7 @@ void PsvrHelmetView::GetViewPoint(glm::mat4& rot_mat) {
 
   rotation_.GetSummRotation(rot_mat);
 }
+
+void PsvrHelmetView::SetRotationSpeedup(double speedup) {
+  rotation_.SetRotationSpeedup(speedup);
+}

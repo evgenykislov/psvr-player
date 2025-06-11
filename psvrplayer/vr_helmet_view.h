@@ -28,6 +28,7 @@ class PsvrHelmetView: public IHelmet, protected PsvrHelmetHid {
   void SetVRMode(VRMode mode) override;
   void CenterView() override;
   void GetViewPoint(glm::mat4& rotation) override;
+  void SetRotationSpeedup(double speedup) override;
 
  protected:
   virtual void OnSensorsData(double to_right, double to_top,

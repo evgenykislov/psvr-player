@@ -37,6 +37,8 @@ class IHelmet {
   virtual void CenterView() = 0;
   // TODO ?? description
   virtual void GetViewPoint(glm::mat4& rotation) = 0;
+  // TODO ?? description
+  virtual void SetRotationSpeedup(double speedup) = 0;
 };
 
 std::shared_ptr<IHelmet> CreateHelmetView();
