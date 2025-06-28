@@ -41,10 +41,13 @@
 #include "vr_helmet_calibration.h"
 #include "vr_helmet_view.h"
 
-const int kCalibrationInterval =
-    2;  //!< интервал для проверки данных, в секундах
-const int kCalibrationTimeout =
-    30;  //!< Интервал калибровки сенсоров шлема, в секундах
+#include "ctrl-c.h"
+
+const int kCalibrationCheck_1 =
+    300;  //!< интервал для проверки данных, в миллисекундах
+const int kCalibrationTimeout_1 =
+    30000;  //!< Интервал калибровки сенсоров шлема, в миллисекундах
+const int kCalibrationTimeTick = 100;  //!< Интервал обновления при калибровке
 
 
 std::shared_ptr<IHelmet> CreateHelmetView() {
@@ -57,22 +60,57 @@ std::shared_ptr<IHelmet> CreateHelmetView() {
 
 
 int DoHelmetDeviceCalibration() {
+  int res = 0;
+  unsigned int cr = CtrlCLibrary::kErrorID;
   try {
+    bool stop_event = false;
+    cr = CtrlCLibrary::SetCtrlCHandler(
+        [&stop_event](CtrlCLibrary::CtrlSignal s) -> bool {
+          if (s == CtrlCLibrary::kCtrlCSignal) {
+            stop_event = true;
+          }
+          return false;
+        });
+    if (cr == CtrlCLibrary::kErrorID) {
+      std::cerr << "Can't set Ctrl+C handler. Calibration interraption isn't "
+                   "available"
+                << std::endl;
+    }
+
     auto vr = std::shared_ptr<PsvrHelmetCalibration>(new PsvrHelmetCalibration);
-    std::this_thread::sleep_for(std::chrono::seconds(kCalibrationInterval));
+
+    int summ = 0;
+    while (!stop_event && summ < kCalibrationCheck_1) {
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(kCalibrationTimeTick));
+      summ += kCalibrationTimeTick;
+    }
+
     if (!vr->IsDataAvailable()) {
       std::cerr << "Helmet data is not available" << std::endl;
-      return 1;
+      throw 1;
     }
-    std::this_thread::sleep_for(
-        std::chrono::seconds(kCalibrationTimeout - kCalibrationInterval));
+
+    while (!stop_event && summ < kCalibrationTimeout_1) {
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(kCalibrationTimeTick));
+      summ += kCalibrationTimeTick;
+    }
+    if (stop_event) {
+      std::cerr << "Calibration has broken by user" << std::endl;
+      throw 1;
+    }
+
     if (!vr->DoneCalibration()) {
       std::cerr << "Calibration faiiled" << std::endl;
-      return 1;
+      throw 1;
     }
     vr.reset();
-    return 0;
+  } catch (int err) {
+    res = err;
   } catch (...) {
+    res = 1;
   }
-  return 1;
+  CtrlCLibrary::ResetCtrlCHandler(cr);
+  return res;
 }

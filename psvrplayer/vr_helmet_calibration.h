@@ -25,7 +25,7 @@ class PsvrHelmetCalibration: public IHelmet, PsvrHelmetHid {
 
  private:
   const int64_t kFixedPointFactor = 1000000000L;
-  const int64_t kMinDataCount = 1000;
+  const int64_t kMinDataCount = 100;
 
   int64_t to_right_summ_;
   int64_t to_top_summ_;

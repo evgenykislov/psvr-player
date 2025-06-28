@@ -25,6 +25,7 @@ set(SOURCE_FILES
   "vr_helmet_hid.cpp"
   "vr_helmet_view.cpp"
   "glad/src/glad.c"
+  "../libs/ctrl-c/ctrl-c.cpp"
   "../libs/home-dir/home-dir.cpp"
   )
 
@@ -44,6 +45,7 @@ set(HEADER_FILES
   "vr_helmet_calibration.h"
   "vr_helmet_hid.h"
   "vr_helmet_view.h"
+  "../libs/ctrl-c/ctrl-c.h"
   "../libs/home-dir/home-dir.h"
   )
 
@@ -67,6 +69,7 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
+include_directories(../libs/ctrl-c)
 include_directories(../libs/iniparser/src)
 include_directories(../libs/home-dir)
 
