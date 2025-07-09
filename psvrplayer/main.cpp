@@ -539,8 +539,8 @@ int DoCalibration() {
 }
 
 int main(int argc, char** argv) {
-  GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color, &cmd_swap_layer,
-      &cmd_rotation);
+  Config::GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
+      &cmd_swap_layer, &cmd_rotation);
 
   if (!ParseCommandLine(argc, argv)) {
     std::cerr << "--------------------------------------" << std::endl;
@@ -593,10 +593,10 @@ int main(int argc, char** argv) {
       }
     } break;
     case kCmdReset:
-      ClearOptions();
+      Config::ClearOptions();
       break;
     case kCmdSave:
-      SetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
+      Config::SetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
           &cmd_swap_layer, &cmd_rotation);
       break;
     case kCmdShow: {

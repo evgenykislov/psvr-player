@@ -11,6 +11,8 @@
 
 const int kDefaultEyesDistance = 66;  //!< Расстояние между окулярами в шлеме
 
+std::mutex g_ConfigLock;
+
 
 std::string GetConfigFileName() {
   static std::mutex mt;
@@ -42,8 +44,10 @@ bool CreateConfigFileIfNotExist(bool force_clear) {
 }
 
 
-void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
-    bool* swap_layer, double* rotation) {
+void Config::SetOptions(std::string* screen, int* eyes_distance,
+    bool* swap_color, bool* swap_layer, double* rotation) {
+  std::lock_guard<std::mutex> lk(g_ConfigLock);
+
   if (!CreateConfigFileIfNotExist(false)) {
     return;
   }
@@ -90,8 +94,10 @@ void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
   }
 }
 
-void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
-    bool* swap_layer, double* rotation) {
+void Config::GetOptions(std::string* screen, int* eyes_distance,
+    bool* swap_color, bool* swap_layer, double* rotation) {
+  std::lock_guard<std::mutex> lk(g_ConfigLock);
+
   auto fname = GetConfigFileName();
   auto dict = iniparser_load(fname.c_str());
   if (!dict) {
@@ -137,4 +143,34 @@ void GetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
   }
 }
 
-void ClearOptions() { CreateConfigFileIfNotExist(true); }
+void Config::ClearOptions() {
+  std::lock_guard<std::mutex> lk(g_ConfigLock);
+  CreateConfigFileIfNotExist(true);
+}
+
+void Config::GetDevicesName(
+    std::string* control_device, std::string* sensor_device) {
+  std::lock_guard<std::mutex> lk(g_ConfigLock);
+
+  if (control_device) {
+    control_device->clear();
+  }
+  if (sensor_device) {
+    sensor_device->clear();
+  }
+
+  auto fname = GetConfigFileName();
+  auto dict = iniparser_load(fname.c_str());
+
+  if (dict) {
+    if (control_device) {
+      *control_device = iniparser_getstring(dict, "Devices:control", "");
+    }
+
+    if (sensor_device) {
+      *sensor_device = iniparser_getstring(dict, "Devices:sensor", "");
+    }
+
+    iniparser_freedict(dict);
+  }
+}

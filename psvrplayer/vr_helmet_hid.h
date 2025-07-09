@@ -4,13 +4,19 @@
 #include <atomic>
 #include <string>
 #include <thread>
+#include <vector>
 
 
 /*! Класс для обработки hid-устройств vr-шлема psvr */
 class PsvrHelmetHid {
  public:
   PsvrHelmetHid();
-  ~PsvrHelmetHid();
+  virtual ~PsvrHelmetHid();
+
+  /*! Получить список всех устройств, относящихся к шлему PSVR
+  \param names возвращаемый список имён (ASCII)
+  \return признак, что выдан корректный список (может быть пустым) */
+  static bool GetDevicesName(std::vector<std::string>& names);
 
  protected:
   /*! Функция для обработки данных скорости поворота от сенсоров. Скорость
@@ -36,10 +42,8 @@ class PsvrHelmetHid {
       10;  //!< Таймаут на чтение данных из hid-устройства
   const double kAccelerationScale = 0.00003125;
 
-  const unsigned short kPsvrVendorID = 0x054c;
-  const unsigned short kPsvrProductID = 0x09af;
-  const char kPSVRControlInterface[4] = ":05";
-  const char kPSVRSensorsInterface[4] = ":04";
+  static const unsigned short kPsvrVendorID = 0x054c;
+  static const unsigned short kPsvrProductID = 0x09af;
 
   std::atomic<void*>
       control_;  //!< Opened control device with hid_device* type. Or nullptr
@@ -65,8 +69,6 @@ class PsvrHelmetHid {
   static int16_t read_int16(const unsigned char* buffer, int offset);
 
   static int32_t read_int32(const unsigned char* buffer, int offset);
-
-  bool GetHidNames(std::string& control, std::string& sensors);
 };
 
 #endif  // PSVRHELMETHID_H
