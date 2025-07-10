@@ -158,7 +158,7 @@ void PsvrHelmetHid::ReadHid() {
     if (last_st == std::numeric_limits<int32_t>::min()) {
       last_st = st;
     }
-    auto dst = st - last_st;
+    auto dst = st - last_st;  // TODO Use hardware timer for calculation
     last_st = st;
 
     int64_t ims =
