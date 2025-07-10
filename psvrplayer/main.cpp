@@ -16,6 +16,7 @@
 #include "version.h"
 #include "video_player.h"
 #include "vr_helmet.h"
+#include "vr_helmet_hid.h"
 
 
 // clang-format off
@@ -29,6 +30,7 @@ const char kHelpMessage[] =
     "  --help - show this help\n"
     "  --play=<file-name> - play movie from specified file\n"
     "  --save - save current options as default\n"
+    "  --selectdevices - select helmet devices for controlling and sensoring\n"
     "  --show=squares|colorlines - show test calibration image\n"
     "  --version - show version information\n"
     "Options:\n"
@@ -48,6 +50,7 @@ const char kCalibrationMessage[] = "Helmet sensors calibration.\n"
     "To cancel the calibration, print no.\n"
     "Start calibration? [yes]:";
 
+
 // clang-format on
 
 enum ParamType { kEmptyValue, kStringValue, kNumberValue };
@@ -62,6 +65,7 @@ enum ParamCmd {
   kCmdReset,
   kCmdRotationSpeedup,
   kCmdSave,
+  kCmdSelectDevices,
   kCmdScreen,
   kCmdShow,
   kCmdSwapColor,
@@ -89,7 +93,7 @@ struct CommandLineValue {
 };
 
 // clang-format off
-std::array<CommandLineParam, 15> CmdParameters = {{
+std::array<CommandLineParam, 16> CmdParameters = {{
   {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
   {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
   {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
@@ -99,6 +103,7 @@ std::array<CommandLineParam, 15> CmdParameters = {{
   {kCmdReset, true, false, kEmptyValue, "--reset", "reset saved options and calibration"},
   {kCmdRotationSpeedup, false, false, kStringValue, "--rotation", "rotation speedup"},
   {kCmdSave, true, false, kEmptyValue, "--save", "save current option"},
+  {kCmdSelectDevices, true, false, kEmptyValue, "--selectdevices", "select devices command"},
   {kCmdScreen, false, false, kStringValue, "--screen=", "select screen"},
   {kCmdShow, true, false, kStringValue, "--show=", "show test images"},
   {kCmdSwapColor, false, false, kEmptyValue, "--swapcolor", "change color palette"},
@@ -522,7 +527,7 @@ int DoCalibration() {
   std::transform(inp.begin(), inp.end(), inp.begin(),
       [](unsigned char c) { return std::tolower(c); });
 
-  if (inp.empty() | inp == "yes" | inp == "y") {
+  if (inp.empty() || inp == "yes" || inp == "y") {
     std::cout << "Calibration ..." << std::endl;
     int res = DoHelmetDeviceCalibration();
     if (res == 0) {
@@ -537,6 +542,68 @@ int DoCalibration() {
 
   return 0;
 }
+
+
+/*! Выбрать устройства шлема для работы.
+\return признак успешха в выборе */
+bool DoSelectDevices() {
+  std::vector<std::string> names;
+  if (!PsvrHelmetHid::GetDevicesName(names)) {
+    std::cout << "Failed to get psvr devices. Connects helmet and try again"
+              << std::endl;
+    return false;
+  }
+  if (names.empty()) {
+    std::cout << "There aren't psvr devices. Connects helmet and try again"
+              << std::endl;
+    return false;
+  }
+
+  // Select controlling
+  std::cout << "Select device for helmet controlling." << std::endl;
+  std::cout << "Hint: control device name usually ends with '5'." << std::endl;
+  std::cout << "Available devices:" << std::endl;
+  for (size_t i = 0; i < names.size(); ++i) {
+    std::cout << "[" << i + 1 << "] " << names[i] << std::endl;
+  }
+
+  std::cout << "Input number from 1 till " << names.size()
+            << " [0 - exit]:" << std::flush;
+  int controldev;
+  std::cin >> controldev;
+  --controldev;
+  if (controldev < 0 || controldev >= (int)names.size()) {
+    return true;
+  }
+  std::cout << "---" << std::endl;
+
+  // Select sensoring
+  std::cout << "Select device with helmet sensors." << std::endl;
+  std::cout << "Hint: sensor device name usually ends with '4'." << std::endl;
+  std::cout << "Available devices:" << std::endl;
+  for (size_t i = 0; i < names.size(); ++i) {
+    std::cout << "[" << i + 1 << "] " << names[i] << std::endl;
+  }
+
+  std::cout << "Input number from 1 till " << names.size()
+            << " [0 - exit]:" << std::flush;
+  int sensordev;
+  std::cin >> sensordev;
+  --sensordev;
+  if (sensordev < 0 || sensordev >= (int)names.size()) {
+    return true;
+  }
+
+  if (controldev == sensordev) {
+    std::cout << "Error: you selects same device for control and sensor"
+              << std::endl;
+    std::cout << "Selection failed" << std::endl;
+  }
+
+  Config::SetDevicesName(names[controldev], names[sensordev]);
+  return true;
+}
+
 
 int main(int argc, char** argv) {
   Config::GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
@@ -598,6 +665,9 @@ int main(int argc, char** argv) {
     case kCmdSave:
       Config::SetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
           &cmd_swap_layer, &cmd_rotation);
+      break;
+    case kCmdSelectDevices:
+      return DoSelectDevices();
       break;
     case kCmdShow: {
       auto l = CmdValues.find(kCmdShow);

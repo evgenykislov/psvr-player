@@ -148,6 +148,7 @@ void Config::ClearOptions() {
   CreateConfigFileIfNotExist(true);
 }
 
+
 void Config::GetDevicesName(
     std::string* control_device, std::string* sensor_device) {
   std::lock_guard<std::mutex> lk(g_ConfigLock);
@@ -169,6 +170,38 @@ void Config::GetDevicesName(
 
     if (sensor_device) {
       *sensor_device = iniparser_getstring(dict, "Devices:sensor", "");
+    }
+
+    iniparser_freedict(dict);
+  }
+}
+
+
+void Config::SetDevicesName(
+    std::string control_device, std::string sensor_device) {
+  std::lock_guard<std::mutex> lk(g_ConfigLock);
+
+  if (!CreateConfigFileIfNotExist(false)) {
+    return;
+  }
+  auto fname = GetConfigFileName();
+  auto dict = iniparser_load(fname.c_str());
+  if (!dict) {
+    std::cerr << "Can't parse configuration file" << std::endl;
+  } else {
+    iniparser_set(dict, "Devices", nullptr);
+
+    iniparser_set(dict, "Devices:control", control_device.c_str());
+    iniparser_set(dict, "Devices:sensor", sensor_device.c_str());
+
+    auto f = fopen(fname.c_str(), "w+");
+    if (!f) {
+      std::cerr << "Can't open configuration file '" << fname << "'"
+                << std::endl;
+    } else {
+      iniparser_dump_ini(dict, f);
+      fclose(f);
+      std::cout << "Devices are saved" << std::endl;
     }
 
     iniparser_freedict(dict);
