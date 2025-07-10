@@ -7,6 +7,8 @@
 
 #include <hidapi/hidapi.h>
 
+#include "config_file.h"
+
 
 PsvrHelmetHid::PsvrHelmetHid(): control_(nullptr), sensors_(nullptr) {
   shutdown_flag_ = false;
@@ -31,6 +33,25 @@ PsvrHelmetHid::~PsvrHelmetHid() {
   CloseDevice();
 }
 
+bool PsvrHelmetHid::GetDevicesName(std::vector<std::string>& names) {
+  auto devs = hid_enumerate(kPsvrVendorID, kPsvrProductID);
+  if (!devs) {
+    return false;
+  }
+
+  names.clear();
+  for (auto dev = devs; dev; dev = dev->next) {
+    try {
+      names.push_back(dev->path);
+    } catch (std::bad_alloc&) {
+    } catch (std::out_of_range&) {
+    }
+  }
+
+  hid_free_enumeration(devs);
+  return true;
+}
+
 
 bool PsvrHelmetHid::OpenDevice() {
   CloseDevice();
@@ -40,7 +61,10 @@ bool PsvrHelmetHid::OpenDevice() {
   std::string control;
   std::string sensors;
 
-  if (!GetHidNames(control, sensors)) {
+  Config::GetDevicesName(&control, &sensors);
+
+  if (control.empty() || sensors.empty()) {
+    std::wcerr << "Names for control and sensors aren't specified" << std::endl;
     return false;
   }
 
@@ -134,7 +158,7 @@ void PsvrHelmetHid::ReadHid() {
     if (last_st == std::numeric_limits<int32_t>::min()) {
       last_st = st;
     }
-    auto dst = st - last_st;
+    auto dst = st - last_st;  // TODO Use hardware timer for calculation
     last_st = st;
 
     int64_t ims =
@@ -163,35 +187,6 @@ int16_t PsvrHelmetHid::read_int16(const unsigned char* buffer, int offset) {
 int32_t PsvrHelmetHid::read_int32(const unsigned char* buffer, int offset) {
   return (buffer[offset + 0] << 0) | (buffer[offset + 1] << 8) |
          (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24);
-}
-
-
-bool PsvrHelmetHid::GetHidNames(std::string& control, std::string& sensors) {
-  auto devs = hid_enumerate(kPsvrVendorID, kPsvrProductID);
-  if (!devs) {
-    return false;
-  }
-
-  control.clear();
-  sensors.clear();
-  for (auto dev = devs; dev; dev = dev->next) {
-    try {
-      std::string p = dev->path;
-      std::string tail = p.substr(p.length() - 3);
-      if (tail == kPSVRControlInterface) {
-        control = p;
-      }
-      if (tail == kPSVRSensorsInterface) {
-        sensors = p;
-      }
-    } catch (std::bad_alloc&) {
-    } catch (std::out_of_range&) {
-    }
-  }
-
-  hid_free_enumeration(devs);
-
-  return true;
 }
 
 
