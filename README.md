@@ -32,13 +32,17 @@ The PSVR headset is connected via a standard VR processor. HDMI and USB connecto
 If you would like headset operates for any user (not administrator only), copy the file **99-psvr.rules** to the directory **/etc/udev/rules.d** and reboot the computer. 
   
 ## Preparing the psvrplayer  
-You need to do two things before using psvrplayer:  
-1. Calibrate the vr helmet  
+You need to do follow things before using psvrplayer:  
+1. Select VR helmet devices  
+Run the command:
+**psvrplayer --selectdevices**  
+and select control and sensor devices from the suggested list.
+2. Calibrate the vr helmet  
 Place the vr helmet on a stable horizontal surface.  
 Run the command:  
 **psvrplayer --calibration**  
 and follow the instructions  
-2. Select vr screen  
+3. Select vr screen  
 Run the command with the vr helmet connected and turned on:  
 **psvrplayer --listscreens**  
 The program will display a list of screens, select the appropriate one for your vr helmet and remember the screen position, for example: **1920x0**  
