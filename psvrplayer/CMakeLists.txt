@@ -69,6 +69,15 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
+# Add glfw library for Windows
+if (WIN32)
+  add_library(glfw STATIC IMPORTED)
+  set_target_properties(glfw PROPERTIES
+    IMPORTED_LOCATION "C:/libglfw/lib/glfw3.lib"
+    INTERFACE_INCLUDE_DIRECTORIES "C:/libglfw/include"
+    )
+endif()
+
 include_directories(../libs/ctrl-c)
 include_directories(../libs/iniparser/src)
 include_directories(../libs/home-dir)
@@ -88,6 +97,10 @@ ENDFOREACH()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES} ${COMPILED_RESOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "glad/include" ".")
+if (WIN32)
+  target_include_directories(${PROJECT_NAME} PRIVATE "c:/libglm")
+endif()
+
 target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
 target_link_libraries(${PROJECT_NAME} ${HIDAPI_LIBRARIES})
