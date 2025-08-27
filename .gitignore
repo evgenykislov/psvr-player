@@ -33,6 +33,7 @@
 
 /build/*
 /build-*/*
+/.vs/*
 *.txt.user
 *.md.backup
 
