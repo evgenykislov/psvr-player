@@ -15,7 +15,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/vector_angle.hpp>
 
-#include <hidapi/hidapi.h>
+#include <hidapi.h>
 
 #include "iniparser.h"
 #include "home-dir.h"
