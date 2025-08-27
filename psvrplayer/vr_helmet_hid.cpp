@@ -5,7 +5,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <hidapi/hidapi.h>
+#include <hidapi.h>
 
 #include "config_file.h"
 

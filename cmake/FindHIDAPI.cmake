@@ -24,12 +24,24 @@
 # http://www.boost.org/LICENSE_1_0.txt)
 
 find_library(HIDAPI_LIBRARY
-		NAMES hidapi hidapi-libusb)
+    NAMES hidapi hidapi-libusb
+    PATHS
+    # Windows hidapi library
+    "c:/libhidapi/x64"
+    )
 
 find_path(HIDAPI_INCLUDE_DIR
-		NAMES hidapi.h
-		PATH_SUFFIXES
-		hidapi)
+    NAMES hidapi.h
+    PATH_SUFFIXES
+    hidapi
+    PATHS
+    # Windows hidapi library
+    "c:/libhidapi/include"
+    )
+
+
+MESSAGE(STATUS "Found Lib HidApi include-dir path: ${HIDAPI_INCLUDE_DIR}")
+
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HIDAPI

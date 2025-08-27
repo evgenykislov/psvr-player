@@ -8,6 +8,7 @@
 
 #if defined(DEBUG_ANGLES) || defined(DEBUG_POSITIONS)
 #include <iostream>
+
 #include <glm/gtx/string_cast.hpp>
 #endif
 
