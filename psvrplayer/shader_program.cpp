@@ -18,13 +18,6 @@
 
 bool CreateShaderProgram(unsigned int& program, unsigned char* vert_data,
     unsigned int vert_len, unsigned char* frag_data, unsigned int frag_len) {
-#if __cplusplus < 201103L
-  // C++11 is not supported
-  // Using output_vertex_shader.data() and other .data() can out string without
-  // null symbol. It can corrupt memory and crash application
-#error C++11 not supported. std::string.data() takes not-null-terminating string
-#endif
-
   GLint success;
   std::string vs(vert_data, vert_data + vert_len);
   GLuint vs_i = glCreateShader(GL_VERTEX_SHADER);
