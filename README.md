@@ -8,7 +8,7 @@ Player features:
 - support for 180 side-by-side (sbs) 3D movie format;
 - minimalistic interface.
   
-Supported OS: Linux.  
+Supported OS: Linux, Windows.  
 
 ## Building for Linux  
   
@@ -26,6 +26,9 @@ Build sequence:
 **cmake -B build**  
 **cmake --build build**  
 **sudo cmake --install build**  
+  
+## Building for Windows  
+See the misc/windows_build.md file.  
   
 ## Connecting PSVR headset  
 The PSVR headset is connected via a standard VR processor. HDMI and USB connectors are connected to the computer instead of connecting to the Playstation.  

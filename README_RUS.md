@@ -8,7 +8,7 @@
 - поддержка 180-гр. side-by-side (sbs) формата 3D фильмов;  
 - минималистичный интерфейс.  
   
-Поддерживаемые ОС: Linux.  
+Поддерживаемые ОС: Linux, Windows.  
   
 ## Сборка под Linux  
   
@@ -26,7 +26,10 @@
 **cmake -B build**  
 **cmake --build build**  
 **sudo cmake --install build**  
-
+  
+## Сборка под Windows  
+См. файл misc/windows_build_rus.md.  
+  
 ## Подключение vr шлема
 PSVR шлем подключается через штатный VR processor. Разъёмы HDMI и USB, вместо подключения к Playstation, подключаются к компьютеру.  
 Для работы оборудования под обычными правами скопируйте файл **99-psvr.rules** в директорию **/etc/udev/rules.d** и перегрузите компьютер.  
