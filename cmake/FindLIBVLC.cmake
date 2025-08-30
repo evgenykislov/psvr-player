@@ -51,7 +51,7 @@ FIND_PATH(LIBVLC_INCLUDE_DIR vlc/vlc.h
     "c:/msys/local/include"
     "c:/Program Files (x86)/VideoLAN/VLC/sdk/include"
     # Windows libvls sdk
-    "c:/libvlcsdk/include"
+    "c:/libvlc/sdk/include"
   )
 FIND_PATH(LIBVLC_INCLUDE_DIR PATHS "${CMAKE_INCLUDE_PATH}/vlc" NAMES vlc.h)
 
@@ -70,7 +70,7 @@ FIND_LIBRARY(LIBVLC_LIBRARY NAMES vlc libvlc
     "c:/msys/local/lib"
     "c:/Program Files (x86)/VideoLAN/VLC/sdk/lib"
     # Windows libvls sdk
-    "c:/libvlcsdk/lib"
+    "c:/libvlc/sdk/lib"
   )
 FIND_LIBRARY(LIBVLC_LIBRARY NAMES vlc libvlc)
 FIND_LIBRARY(LIBVLCCORE_LIBRARY NAMES vlccore libvlccore
@@ -86,7 +86,7 @@ FIND_LIBRARY(LIBVLCCORE_LIBRARY NAMES vlccore libvlccore
     "c:/msys/local/lib"
     "c:/Program Files (x86)/VideoLAN/VLC/sdk/lib"
     # Windows libvls sdk
-    "c:/libvlcsdk/lib"
+    "c:/libvlc/sdk/lib"
   )
 FIND_LIBRARY(LIBVLCCORE_LIBRARY NAMES vlccore libvlccore)
 

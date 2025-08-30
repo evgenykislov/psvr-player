@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.18)
 
 project(psvrplayer LANGUAGES C CXX)
 project(${PROJECT_NAME} VERSION 1.0.0)
@@ -73,7 +73,7 @@ find_package (Threads REQUIRED)
 if (WIN32)
   add_library(glfw STATIC IMPORTED)
   set_target_properties(glfw PROPERTIES
-    IMPORTED_LOCATION "C:/libglfw/lib/glfw3.lib"
+    IMPORTED_LOCATION "C:/libglfw/lib/glfw3_mt.lib"
     INTERFACE_INCLUDE_DIRECTORIES "C:/libglfw/include"
     )
 endif()

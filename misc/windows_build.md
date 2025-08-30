@@ -8,10 +8,10 @@ For example:
 The vlc library version 3.0.21 for win64 can be downloaded from the link:  
 https://download.videolan.org/pub/videolan/vlc/3.0.21/win64/vlc-3.0.21-win64.7z  
   
-Create the libvlcsdk folder in the root of the C: drive. Copy the contents of the sdk folder (vlc-3.0.21\sdk) of the archive to this folder.  
+Create the libvlcsdk folder in the root of the C: drive. Copy the contents of the sdk folder vlc-3.0.21 (or similar) of the archive to this folder.  
 Note: if everything is done correctly, then there must be a file  
-C:\libvlcsdk\include\vlc\libvlc.h  
-In folder C:\libvlcsdk\lib delete the vlc.lib and vlccore.lib files (they are 20 bytes in size and link to other files).  
+C:\libvlc\sdk\include\vlc\libvlc.h  
+In folder C:\libvlc\sdk\lib delete the vlc.lib and vlccore.lib files (they are 20 bytes in size and link to other files).  
   
 ### Hid Api  
 Download the HidApi library from here:  
