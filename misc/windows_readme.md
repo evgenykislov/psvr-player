@@ -1,4 +1,4 @@
-# psvr-player
+# psvr-player v1.2.0
 A 3D movie player for the PS VR headset connected to your computer.
 
 Player features:  
