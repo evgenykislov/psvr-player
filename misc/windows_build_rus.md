@@ -12,6 +12,13 @@ https://download.videolan.org/pub/videolan/vlc/3.0.21/win64/vlc-3.0.21-win64.7z
 Прим.: если всё сделано правильно, то должен существовать файл  
 C:\libvlc\sdk\include\vlc\libvlc.h  
 В папке C:\libvlc\sdk\lib удаляем файлы vlc.lib и vlccore.lib (они размером с 20 байт и указывают на другие файлы).  
+
+### LibUsb
+Библиотеку LibUsb качаем отсюда:
+https://github.com/libusb/libusb/releases
+Берём последний релиз (например, libusb 1.0.29).
+Создаём папку C:\libusb и записываем папку include из архива с релизом.
+Создаём папку C:\libusb\lib и записываем в неё содержимое папки VS2022\MS64 из архива.
   
 ### Hid Api  
 Библиотеку HidApi качаем отсюда:  
