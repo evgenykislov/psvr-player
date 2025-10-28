@@ -69,12 +69,20 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
-# Add glfw library for Windows
+# Add libraries for windows
 if (WIN32)
+  # Add glfw library for Windows
   add_library(glfw STATIC IMPORTED)
   set_target_properties(glfw PROPERTIES
     IMPORTED_LOCATION "C:/libglfw/lib/glfw3_mt.lib"
     INTERFACE_INCLUDE_DIRECTORIES "C:/libglfw/include"
+    )
+
+  # Add libusb
+  add_library(libusb STATIC IMPORTED)
+  set_target_properties(libusb PROPERTIES
+    IMPORTED_LOCATION "C:/libusb/lib/libusb-1.0.lib"
+    INTERFACE_INCLUDE_DIRECTORIES "C:/libusb/include"
     )
 endif()
 
@@ -102,6 +110,7 @@ if (WIN32)
 endif()
 
 target_link_libraries(${PROJECT_NAME} glfw)
+target_link_libraries(${PROJECT_NAME} libusb)
 target_link_libraries(${PROJECT_NAME} ${LIBVLC_LIBRARY})
 target_link_libraries(${PROJECT_NAME} ${HIDAPI_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
