@@ -34,6 +34,7 @@
 /build/*
 /build-*/*
 /.vs/*
+/out/*
 *.txt.user
 *.md.backup
 
