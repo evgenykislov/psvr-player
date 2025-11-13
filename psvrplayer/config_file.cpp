@@ -150,14 +150,14 @@ void Config::ClearOptions() {
 
 
 void Config::GetDevicesName(
-    std::string* control_device, std::string* sensor_device) {
+    uint32_t* control_device, uint32_t* sensor_device) {
   std::lock_guard<std::mutex> lk(g_ConfigLock);
 
   if (control_device) {
-    control_device->clear();
+    *control_device = uint32_t(-1);
   }
   if (sensor_device) {
-    sensor_device->clear();
+    *sensor_device = uint32_t(-1);
   }
 
   auto fname = GetConfigFileName();
@@ -165,11 +165,11 @@ void Config::GetDevicesName(
 
   if (dict) {
     if (control_device) {
-      *control_device = iniparser_getstring(dict, "Devices:control", "");
+      *control_device = iniparser_getuint64(dict, "Devices:control", uint32_t(-1));
     }
 
     if (sensor_device) {
-      *sensor_device = iniparser_getstring(dict, "Devices:sensor", "");
+      *sensor_device = iniparser_getuint64(dict, "Devices:sensor", uint32_t(-1));
     }
 
     iniparser_freedict(dict);
@@ -178,7 +178,7 @@ void Config::GetDevicesName(
 
 
 void Config::SetDevicesName(
-    std::string control_device, std::string sensor_device) {
+    uint32_t control_device, uint32_t sensor_device) {
   std::lock_guard<std::mutex> lk(g_ConfigLock);
 
   if (!CreateConfigFileIfNotExist(false)) {
@@ -191,8 +191,8 @@ void Config::SetDevicesName(
   } else {
     iniparser_set(dict, "Devices", nullptr);
 
-    iniparser_set(dict, "Devices:control", control_device.c_str());
-    iniparser_set(dict, "Devices:sensor", sensor_device.c_str());
+    iniparser_set(dict, "Devices:control", std::to_string(control_device).c_str());
+    iniparser_set(dict, "Devices:sensor", std::to_string(sensor_device).c_str());
 
     auto f = fopen(fname.c_str(), "w+");
     if (!f) {

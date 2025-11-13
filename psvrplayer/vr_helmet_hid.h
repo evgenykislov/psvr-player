@@ -2,10 +2,48 @@
 #define PSVRHELMETHID_H
 
 #include <atomic>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
+class libusb_context;
+
+/*!
+ * @brief Описание интерфейса-конечной точки для работы со шлемом
+ */
+struct PointDescription {
+  unsigned int Interface;
+  unsigned int AltSetting;
+  unsigned int Endpoint;
+  std::string Description;
+  bool ControlPoint;
+
+  std::string FormatName() {
+    std::stringstream r;
+    r << Description << " {" << Interface << "-" << AltSetting << "-" << Endpoint << "}";
+    return r.str();
+  }
+
+  uint32_t Serialize() {
+    uint32_t r = 0;
+    r |= Interface & 0xff;
+    r <<= 8;
+    r |= AltSetting & 0xff;
+    r <<= 8;
+    r |= Endpoint;
+    return r;
+  }
+
+  void Deserialize(uint32_t v) {
+    Endpoint = v & 0xff;
+    AltSetting = (v >> 8) & 0xff;
+    Interface = (v >> 16) & 0xff;
+    ControlPoint = false;
+    Description.clear();
+  }
+
+};
 
 /*! Класс для обработки hid-устройств vr-шлема psvr */
 class PsvrHelmetHid {
@@ -14,9 +52,8 @@ class PsvrHelmetHid {
   virtual ~PsvrHelmetHid();
 
   /*! Получить список всех устройств, относящихся к шлему PSVR
-  \param names возвращаемый список имён (ASCII)
-  \return признак, что выдан корректный список (может быть пустым) */
-  static bool GetDevicesName(std::vector<std::string>& names);
+  \return список точек для подключения с именами. Если список пустой, то устройства нет или занято */
+  static std::vector<PointDescription> GetDevicesName();
 
  protected:
   /*! Функция для обработки данных скорости поворота от сенсоров. Скорость
@@ -44,6 +81,8 @@ class PsvrHelmetHid {
 
   static const unsigned short kPsvrVendorID = 0x054c;
   static const unsigned short kPsvrProductID = 0x09af;
+
+  libusb_context* usb_context_;
 
   std::atomic<void*>
       control_;  //!< Opened control device with hid_device* type. Or nullptr
