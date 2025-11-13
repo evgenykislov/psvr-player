@@ -547,60 +547,56 @@ int DoCalibration() {
 /*! Выбрать устройства шлема для работы.
 \return признак успешха в выборе */
 bool DoSelectDevices() {
-  std::vector<std::string> names;
-  if (!PsvrHelmetHid::GetDevicesName(names)) {
-    std::cout << "Failed to get psvr devices. Connects helmet and try again"
-              << std::endl;
-    return false;
-  }
-  if (names.empty()) {
+  auto r = PsvrHelmetHid::GetDevicesName();
+  if (r.empty()) {
     std::cout << "There aren't psvr devices. Connects helmet and try again"
               << std::endl;
     return false;
   }
 
-  // Select controlling
-  std::cout << "Select device for helmet controlling." << std::endl;
-  std::cout << "Hint: control device name usually ends with '5'." << std::endl;
-  std::cout << "Available devices:" << std::endl;
-  for (size_t i = 0; i < names.size(); ++i) {
-    std::cout << "[" << i + 1 << "] " << names[i] << std::endl;
+  decltype(r) ctl, snl;
+  for (auto& item : r) {
+    if (item.ControlPoint) {
+      ctl.push_back(item);
+    } else {
+      snl.push_back(item);
+    }
   }
 
-  std::cout << "Input number from 1 till " << names.size()
+  // Select controlling
+  std::cout << "Select device for helmet controlling." << std::endl;
+  std::cout << "Available devices:" << std::endl;
+  for (size_t i = 0; i < ctl.size(); ++i) {
+    std::cout << "[" << i + 1 << "] " << ctl[i].FormatName() << std::endl;
+  }
+
+  std::cout << "Input number from 1 till " << ctl.size()
             << " [0 - exit]:" << std::flush;
   int controldev;
   std::cin >> controldev;
   --controldev;
-  if (controldev < 0 || controldev >= (int)names.size()) {
+  if (controldev < 0 || controldev >= (int)ctl.size()) {
     return true;
   }
   std::cout << "---" << std::endl;
 
   // Select sensoring
   std::cout << "Select device with helmet sensors." << std::endl;
-  std::cout << "Hint: sensor device name usually ends with '4'." << std::endl;
   std::cout << "Available devices:" << std::endl;
-  for (size_t i = 0; i < names.size(); ++i) {
-    std::cout << "[" << i + 1 << "] " << names[i] << std::endl;
+  for (size_t i = 0; i < snl.size(); ++i) {
+    std::cout << "[" << i + 1 << "] " << snl[i].FormatName() << std::endl;
   }
 
-  std::cout << "Input number from 1 till " << names.size()
+  std::cout << "Input number from 1 till " << snl.size()
             << " [0 - exit]:" << std::flush;
   int sensordev;
   std::cin >> sensordev;
   --sensordev;
-  if (sensordev < 0 || sensordev >= (int)names.size()) {
+  if (sensordev < 0 || sensordev >= (int)snl.size()) {
     return true;
   }
 
-  if (controldev == sensordev) {
-    std::cout << "Error: you selects same device for control and sensor"
-              << std::endl;
-    std::cout << "Selection failed" << std::endl;
-  }
-
-  Config::SetDevicesName(names[controldev], names[sensordev]);
+  Config::SetDevicesName(ctl[controldev].Serialize(), snl[sensordev].Serialize());
   return true;
 }
 

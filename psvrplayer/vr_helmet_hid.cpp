@@ -3,18 +3,29 @@
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 
 #include <hidapi.h>
+#include <libusb.h>
 
 #include "config_file.h"
 
+// Хак для обработки хидеров: товарисчи везде пихают свою реализацию min
+#undef min
 
 PsvrHelmetHid::PsvrHelmetHid(): control_(nullptr), sensors_(nullptr) {
   shutdown_flag_ = false;
   sensor_timer_ = 0;
 
+  auto ur = libusb_init_context(&usb_context_, nullptr, 0);
+  if (ur != 0) {
+    throw std::runtime_error("Can't open usb support");
+  }
+
   if (!OpenDevice()) {
+    libusb_exit(usb_context_);
+    usb_context_ = nullptr;
     throw std::runtime_error("Can't open hid device");
   }
 
@@ -31,25 +42,71 @@ PsvrHelmetHid::~PsvrHelmetHid() {
   }
 
   CloseDevice();
+
+  libusb_exit(usb_context_);
+  usb_context_ = nullptr;
 }
 
-bool PsvrHelmetHid::GetDevicesName(std::vector<std::string>& names) {
-  auto devs = hid_enumerate(kPsvrVendorID, kPsvrProductID);
-  if (!devs) {
-    return false;
+
+std::vector<PointDescription> PsvrHelmetHid::GetDevicesName() {
+  std::vector<PointDescription> res;
+
+  // Статичная функция с персональной инициализацией всего
+  libusb_context* ctx;
+  if (libusb_init_context(&ctx, nullptr, 0) != 0) {
+    std::wcerr << "Failed initialize usb subsystem" << std::endl;
+    return {};
+  }
+  auto h = libusb_open_device_with_vid_pid(ctx, kPsvrVendorID, kPsvrProductID);
+  if (!h) {
+    libusb_exit(ctx);
+    return res;
   }
 
-  names.clear();
-  for (auto dev = devs; dev; dev = dev->next) {
-    try {
-      names.push_back(dev->path);
-    } catch (std::bad_alloc&) {
-    } catch (std::out_of_range&) {
+
+  libusb_device* dev = libusb_get_device(h);
+  libusb_config_descriptor* cfg;
+  const int kBufferLen = 200;
+  unsigned char buffer[kBufferLen];
+  PointDescription point;
+  if (libusb_get_active_config_descriptor(dev, &cfg) >= 0) {
+    for (int i = 0; i < cfg->bNumInterfaces; ++i) {
+      const libusb_interface* iff = &(cfg->interface[i]);
+      for (int j = 0; j < iff->num_altsetting; ++j) {        
+        const struct libusb_interface_descriptor* id = &(iff->altsetting[j]);
+        point.Interface = id->bInterfaceNumber;
+        point.AltSetting = id->bAlternateSetting;
+        point.Description.clear();
+        // Имя интерфейса
+        int l = libusb_get_string_descriptor_ascii(
+            h, id->iInterface, buffer, kBufferLen);
+        if (l >= 0 && l < kBufferLen) {
+            point.Description = std::string(buffer, buffer + l);
+        }
+
+        // Поищём точки ввода и вывода для передачи по прерываниям
+        bool has_in_intr = false;
+        bool has_out_intr = false;
+        for (int e = 0; e < id->bNumEndpoints; ++e) {
+          const struct libusb_endpoint_descriptor* ed = &(id->endpoint[e]);
+          if ((ed->bmAttributes & 0x03) != LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT) {
+            continue;
+          }
+          point.Endpoint = ed->bEndpointAddress & 0x0f;
+          point.ControlPoint = (ed->bEndpointAddress & 0x80) == LIBUSB_ENDPOINT_OUT;
+          res.push_back(point);
+        }
+      }
     }
+
+    libusb_free_config_descriptor(cfg);
   }
 
-  hid_free_enumeration(devs);
-  return true;
+  libusb_close(h);
+
+  libusb_exit(ctx);
+
+  return res;
 }
 
 
@@ -58,16 +115,18 @@ bool PsvrHelmetHid::OpenDevice() {
   assert(!control_);
   assert(!sensors_);
 
-  std::string control;
-  std::string sensors;
+  uint32_t control;
+  uint32_t sensors;
 
   Config::GetDevicesName(&control, &sensors);
 
-  if (control.empty() || sensors.empty()) {
+  if (control == uint32_t(-1) || sensors == uint32_t(-1)) {
     std::wcerr << "Names for control and sensors aren't specified" << std::endl;
     return false;
   }
 
+  return false;
+/*
   control_ = hid_open_path(control.c_str());
   if (!control_) {
     auto he = hid_error(nullptr);
@@ -87,7 +146,7 @@ bool PsvrHelmetHid::OpenDevice() {
     control_ = nullptr;
     return false;
   }
-
+*/
   return true;
 }
 

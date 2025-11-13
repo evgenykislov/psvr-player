@@ -15,10 +15,10 @@ void SetOptions(std::string* screen, int* eyes_distance, bool* swap_color,
     bool* swap_layer, double* rotation);
 
 /*! Получить имена из конфигурационного файла. */
-void GetDevicesName(std::string* control_device, std::string* sensor_device);
+void GetDevicesName(uint32_t* control_device, uint32_t* sensor_device);
 
 /*! Сохранить имена из конфигурационного файла. */
-void SetDevicesName(std::string control_device, std::string sensor_device);
+void SetDevicesName(uint32_t control_device, uint32_t sensor_device);
 
 /*! Очистить все сохранённые опции. Функция потокобезопасная */
 void ClearOptions();
