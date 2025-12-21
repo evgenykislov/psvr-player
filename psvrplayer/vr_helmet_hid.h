@@ -8,6 +8,7 @@
 #include <vector>
 
 class libusb_context;
+class libusb_device_handle;
 
 /*!
  * @brief Описание интерфейса-конечной точки для работы со шлемом
@@ -74,25 +75,26 @@ class PsvrHelmetHid {
   PsvrHelmetHid& operator=(const PsvrHelmetHid&) = delete;
   PsvrHelmetHid& operator=(PsvrHelmetHid&&) = delete;
 
-  static const size_t kMaxBufferSize = 128;
   static const int kReadTimeout =
       10;  //!< Таймаут на чтение данных из hid-устройства
+  static const int kWriteTimeout =
+      1000;  //!< Таймаут на запись данных в hid-устройство
   const double kAccelerationScale = 0.00003125;
 
   static const unsigned short kPsvrVendorID = 0x054c;
   static const unsigned short kPsvrProductID = 0x09af;
 
   libusb_context* usb_context_;
+  libusb_device_handle* usb_device_;
 
-  std::atomic<void*>
+  std::atomic<uint32_t>
       control_;  //!< Opened control device with hid_device* type. Or nullptr
-  std::atomic<void*> sensors_;  //!< Устройство-сенсоры шлема
+  std::atomic<uint32_t> sensors_;  //!< Устройство-сенсоры шлема
   uint64_t sensor_timer_;  //!< Часы таймера. Монотонно растут, отсчитывают
                            //!< микросекунды
   std::thread read_thread_;  //!< Поток чтения позиции шлема
   std::atomic_bool shutdown_flag_;  //!< Флаг завершения поток чтения
 
-  unsigned char buffer_[kMaxBufferSize];
 
   bool OpenDevice();
   void CloseDevice();
