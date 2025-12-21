@@ -14,7 +14,11 @@
 // Хак для обработки хидеров: товарисчи везде пихают свою реализацию min
 #undef min
 
-PsvrHelmetHid::PsvrHelmetHid(): control_(nullptr), sensors_(nullptr) {
+PsvrHelmetHid::PsvrHelmetHid()
+    : control_(uint32_t(-1)),
+      sensors_(uint32_t(-1)),
+      usb_context_(nullptr),
+      usb_device_(nullptr) {
   shutdown_flag_ = false;
   sensor_timer_ = 0;
 
@@ -22,6 +26,9 @@ PsvrHelmetHid::PsvrHelmetHid(): control_(nullptr), sensors_(nullptr) {
   if (ur != 0) {
     throw std::runtime_error("Can't open usb support");
   }
+
+//  libusb_set_option(
+//      usb_context_, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
 
   if (!OpenDevice()) {
     libusb_exit(usb_context_);
@@ -92,7 +99,7 @@ std::vector<PointDescription> PsvrHelmetHid::GetDevicesName() {
           if ((ed->bmAttributes & 0x03) != LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT) {
             continue;
           }
-          point.Endpoint = ed->bEndpointAddress & 0x0f;
+          point.Endpoint = ed->bEndpointAddress;
           point.ControlPoint = (ed->bEndpointAddress & 0x80) == LIBUSB_ENDPOINT_OUT;
           res.push_back(point);
         }
@@ -112,8 +119,6 @@ std::vector<PointDescription> PsvrHelmetHid::GetDevicesName() {
 
 bool PsvrHelmetHid::OpenDevice() {
   CloseDevice();
-  assert(!control_);
-  assert(!sensors_);
 
   uint32_t control;
   uint32_t sensors;
@@ -125,63 +130,41 @@ bool PsvrHelmetHid::OpenDevice() {
     return false;
   }
 
-  return false;
-/*
-  control_ = hid_open_path(control.c_str());
-  if (!control_) {
-    auto he = hid_error(nullptr);
-    if (he) {
-      std::wcerr << "Helmet control open error: " << he << std::endl;
-    }
+  control_ = control;
+  sensors_ = sensors;
+
+  usb_device_ = libusb_open_device_with_vid_pid(usb_context_, kPsvrVendorID, kPsvrProductID);
+  if (!usb_device_) {
+    std::wcerr << "Can't open vr helmet device" << std::endl;
     return false;
   }
 
-  sensors_ = hid_open_path(sensors.c_str());
-  if (!sensors_) {
-    auto he = hid_error(nullptr);
-    if (he) {
-      std::wcerr << "Helmet sensors open error: " << he << std::endl;
-    }
-    hid_close((hid_device*)control_.load());
-    control_ = nullptr;
-    return false;
-  }
-*/
   return true;
 }
 
 
 void PsvrHelmetHid::CloseDevice() {
-  void* d = nullptr;
-  control_.exchange(d);
-  if (d) {
-    SplitScreen(false);
-    hid_close((hid_device*)d);
-    auto he = hid_error(nullptr);
-    if (he) {
-      std::wcerr << "Helmet control close error: " << he << std::endl;
-    }
-  }
-
-  d = nullptr;
-  sensors_.exchange(d);
-  if (d) {
-    hid_close((hid_device*)d);
-    auto he = hid_error(nullptr);
-    if (he) {
-      std::wcerr << "Helmet sensors close error: " << he << std::endl;
-    }
+  if (usb_device_) {
+    SplitScreen(false); // Принудительно возвращаем обычный режим (неразделённый)
+    libusb_close(usb_device_);
+    usb_device_ = nullptr;
   }
 }
 
 
 void PsvrHelmetHid::ReadHid() {
-  hid_device* dev = (hid_device*)sensors_.load();
-  if (!dev) {
+  assert(usb_device_);
+
+  PointDescription snr;
+  snr.Deserialize(sensors_.load());
+
+  int err = libusb_claim_interface(usb_device_, snr.Interface);
+  if (err != 0) {
+    std::wcerr << "Error of device sensors claiming: " << libusb_strerror(err) << std::endl;
     return;
   }
 
-  // TODO Использовать аппакратные часы таймера вместо компьютерных
+  // TODO Использовать аппаратные часы таймера вместо компьютерных
   std::chrono::steady_clock::time_point prev_reading =
       std::chrono::steady_clock::now();
 
@@ -191,20 +174,29 @@ void PsvrHelmetHid::ReadHid() {
     }
 
     const int kPacketSize = 64;
+    const int kMaxBufferSize = 70;
     unsigned char buffer[kMaxBufferSize];
-    int size = hid_read_timeout(dev, buffer, kMaxBufferSize, kReadTimeout);
+    int transf;
+    int res = libusb_interrupt_transfer(usb_device_, snr.Endpoint, buffer,
+        kMaxBufferSize, &transf, kReadTimeout);
     auto ct = std::chrono::steady_clock::now();
 
-    if (size == -1) {
-      // Ошибка чтения устройства. Похоже, это не лечится
+    if (res != 0) {
+      // Ошибка чтения устройства
+      if (res == LIBUSB_ERROR_TIMEOUT) {
+        // Недождались. Подождём ещё
+        continue;
+      }
+      
+      // Остальное, похоже, не лечится
+      std::wcerr << "Error of device sensors reading: " << libusb_strerror(res)
+                 << std::endl;
       break;
     }
-    if (size == 0) {
-      // Ждали. Данных нет
-      continue;
-    }
 
-    if (size != kPacketSize) {
+    if ((transf != kPacketSize) && (transf != kPacketSize + 1)) {
+      // Пришли данные неожиданного размера
+      // Прим.: может передаваться завершающий 0 вне запрашиваемого пакета
       continue;
     }
 
@@ -232,6 +224,13 @@ void PsvrHelmetHid::ReadHid() {
 
     OnSensorsData(right_da, top_da, roll_da, sensor_timer_);
   }
+
+  err = libusb_release_interface(usb_device_, snr.Interface);
+  if (err != 0) {
+    std::wcerr << "Error of device sensors releasing: " << libusb_strerror(err)
+               << std::endl;
+    return;
+  }
 }
 
 
@@ -250,14 +249,51 @@ int32_t PsvrHelmetHid::read_int32(const unsigned char* buffer, int offset) {
 
 
 bool PsvrHelmetHid::SplitScreen(bool split_mode) {
-  buffer_[0] = 0x23;
-  buffer_[1] = 0x00;
-  buffer_[2] = 0xaa;
-  buffer_[3] = 0x04;
-  buffer_[4] = split_mode ? 0x01 : 0x00;
-  buffer_[5] = 0x00;
-  buffer_[6] = 0x00;
-  buffer_[7] = 0x00;
+  bool r = true;
+  assert(usb_device_);
 
-  return hid_write((hid_device*)control_.load(), buffer_, 8) != -1;
+  PointDescription cnt;
+  cnt.Deserialize(control_.load());
+
+  int err = libusb_claim_interface(usb_device_, cnt.Interface);
+  if (err != 0) {
+    std::wcerr << "Error of device control claiming: " << libusb_strerror(err)
+               << std::endl;
+    return false;
+  }
+
+  const size_t kBufferSize = 8;
+  unsigned char buffer[kBufferSize];
+  buffer[0] = 0x23;
+  buffer[1] = 0x00;
+  buffer[2] = 0xaa;
+  buffer[3] = 0x04;
+  buffer[4] = split_mode ? 0x01 : 0x00;
+  buffer[5] = 0x00;
+  buffer[6] = 0x00;
+  buffer[7] = 0x00;
+
+  int transf;
+  int res = libusb_interrupt_transfer(
+      usb_device_, cnt.Endpoint, buffer, kBufferSize, &transf, kWriteTimeout);
+
+  if (res != 0) {
+    // Ошибка записи устройства
+    std::wcerr << "Error of device control writing: " << libusb_strerror(res)
+                << std::endl;
+    r = false;
+  } else if (transf != kBufferSize) {
+    // Записались не все данные
+    std::wcerr << "Can't write whole packet of data" << std::endl;
+    r = false;
+  }
+
+  err = libusb_release_interface(usb_device_, cnt.Interface);
+  if (err != 0) {
+    std::wcerr << "Error of device releasing releasing: " << libusb_strerror(err)
+               << std::endl;
+    return false;
+  }
+
+  return r;
 }
