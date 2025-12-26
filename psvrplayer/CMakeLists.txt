@@ -16,6 +16,7 @@ set(SOURCE_FILES
   "monitors.cpp"
   "play_screen.cpp"
   "playing.cpp"
+  "psvrplayer.cpp"
   "rotation.cpp"
   "shader_program.cpp"
   "transformer.cpp"

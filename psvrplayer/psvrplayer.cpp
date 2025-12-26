@@ -613,11 +613,7 @@ bool DoSelectDevices() {
 }
 
 
-int main(int argc, char** argv) {
-  argc = 2;
-  char* a[2] = {argv[0], "--hotkeys"};
-  argv = a;
-
+int psvrplayer_main(int argc, char** argv) {
   Config::GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
       &cmd_swap_layer, &cmd_rotation);
 
