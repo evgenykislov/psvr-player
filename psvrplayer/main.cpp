@@ -28,6 +28,7 @@ const char kHelpMessage[] =
     "  --calibration - calibrate vr helmet device\n"
     "  --listscreens - show list of available screens with their position\n"
     "  --help - show this help\n"
+    "  --hotkeys - set hot keys for play control\n"
     "  --play=<file-name> - play movie from specified file\n"
     "  --save - save current options as default\n"
     "  --selectdevices - select helmet devices for controlling and sensoring\n"
@@ -59,6 +60,7 @@ enum ParamCmd {
   kCmdCalibration,
   kCmdEyes,
   kCmdHelp,
+  kCmdHotKeys,
   kCmdLayer,
   kCmdListScreens,
   kCmdPlay,
@@ -93,10 +95,12 @@ struct CommandLineValue {
 };
 
 // clang-format off
-std::array<CommandLineParam, 16> CmdParameters = {{
+std::array<CommandLineParam, 17> CmdParameters = {{
+  // Constant, IsCommand, IsMultiVal, ValueType, Prefix, Description
   {kCmdCalibration, true, false, kEmptyValue, "--calibration", "calibration command"},
   {kCmdEyes, false, false, kNumberValue, "--eyes=", "interpupillary distance"},
   {kCmdHelp, true, false, kEmptyValue, "--help", "help command"},
+  {kCmdHotKeys, true, false, kEmptyValue, "--hotkeys", "hot keys for playing"},
   {kCmdLayer, false, false, kStringValue, "--layer=", "layer switcher"},
   {kCmdListScreens, true, false, kEmptyValue, "--listscreens", "list screens command"},
   {kCmdPlay, true, true, kStringValue, "--play=", "play movie file"},
@@ -544,6 +548,14 @@ int DoCalibration() {
 }
 
 
+/*! Установить горячие клавиши для управления */
+void DoSetHotKeys() {
+  std::cout << "Setting hot keys:" << std::endl;
+//   std::cout ???
+
+}
+
+
 /*! Выбрать устройства шлема для работы.
 \return признак успешха в выборе */
 bool DoSelectDevices() {
@@ -602,6 +614,10 @@ bool DoSelectDevices() {
 
 
 int main(int argc, char** argv) {
+  argc = 2;
+  char* a[2] = {argv[0], "--hotkeys"};
+  argv = a;
+
   Config::GetOptions(&cmd_screen, &cmd_eyes_distance, &cmd_swap_color,
       &cmd_swap_layer, &cmd_rotation);
 
@@ -633,6 +649,9 @@ int main(int argc, char** argv) {
       break;
     case kCmdHelp:
       PrintHelp();
+      break;
+    case kCmdHotKeys:
+      DoSetHotKeys();
       break;
     case kCmdListScreens:
       res = PrintMonitors();
