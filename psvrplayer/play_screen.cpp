@@ -138,6 +138,15 @@ GLFWmonitor* OpenGLScreen::GetMonitor(std::string screen) {
   if (!mons) {
     throw std::runtime_error("ERROR: Can't get screens list");
   }
+  // Список мониторов создаётся в библиотеке glfw и ей же удаляется (самому
+  // удалять не нужно). Значение элементов можно хранить ??
+  if (amount == 0) {
+    throw std::runtime_error("ERROR: There isn't any screen");
+  }
+  if (screen.empty()) {
+    // При запросе любого монитора выдаём самый первый (основной)
+    return mons[0];
+  }
   for (int i = 0; i < amount; ++i) {
     int x, y;
     glfwGetMonitorPos(mons[i], &x, &y);

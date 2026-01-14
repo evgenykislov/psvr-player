@@ -41,7 +41,9 @@ class IPlayScreen {
 using IPlayScreenPtr = std::shared_ptr<IPlayScreen>;
 
 /*! Создать окно для проигрывания. Запуск выполняется
-только в основном потоке
+только в основном потоке.
+\param screen строка с позицией экрана (например, "1920x0"). Строка может быть
+пустой, тогда окно создаётся на первом найденном экране
 \return указатель на новое окно. При ошибке возвращается nullptr. */
 IPlayScreenPtr CreatePlayScreen(std::string screen);
 

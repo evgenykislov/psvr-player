@@ -553,6 +553,25 @@ void DoSetHotKeys() {
   std::cout << "Setting hot keys:" << std::endl;
 //   std::cout ???
 
+
+  auto ps = CreatePlayScreen(cmd_screen);
+  if (!ps) {
+    std::cerr << "Logic error: Setting hot keys needs a screen :)" << std::endl;
+    return;
+  }
+
+  int counter = 0;
+  ps->SetKeyboardFilter(
+      [&counter](int key, int scancode, int action, int mods) {
+        std::cout << "some key" << std::endl;
+        ++counter;
+        if (counter > 3) {
+          std::cout << "asdfasdfasdffw" << std::endl;
+        }
+      });
+  ps->Run();
+  // Reset filter
+  ps->SetKeyboardFilter({});
 }
 
 
